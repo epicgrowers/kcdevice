@@ -125,6 +125,7 @@ void app_main(void)
     // Phase 2: WiFi Connection (Required for Network Services)
     // ========================================================================
     bool connected = false;
+    bool sensor_task_launched = false;  // Track if sensor task was launched during provisioning
     char stored_ssid[33] = {0};
     char stored_password[64] = {0};
 
@@ -170,15 +171,51 @@ void app_main(void)
         const char *service_name = idf_provisioning_get_service_name();
         ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
 
+        // ⭐ NEW: Launch sensor task BEFORE provisioning to utilize wait time
+        ESP_LOGI(TAG, "========================================");
+        ESP_LOGI(TAG, "MAIN: Launching sensor task during provisioning");
+        ESP_LOGI(TAG, "========================================");
+        
+        BaseType_t task_ret = xTaskCreate(
+            sensor_task,
+            "sensor_task",
+            SENSOR_TASK_STACK_SIZE,
+            NULL,
+            SENSOR_TASK_PRIORITY,
+            NULL
+        );
+        
+        if (task_ret != pdPASS) {
+            ESP_LOGW(TAG, "MAIN: Failed to create sensor task during provisioning");
+        } else {
+            ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+            sensor_task_launched = true;
+        }
+
         ret = idf_provisioning_start();
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
             return;
         }
 
-        // Wait for provisioning to complete
+        // Wait for provisioning to complete (sensors initializing in parallel)
+        ESP_LOGI(TAG, "MAIN: Waiting for provisioning (sensors initializing in background)...");
+        int provisioning_wait_seconds = 0;
         while (idf_provisioning_is_running()) {
             vTaskDelay(pdMS_TO_TICKS(1000));
+            provisioning_wait_seconds++;
+            
+            // Check and log sensor progress every 10 seconds
+            if (provisioning_wait_seconds % 10 == 0) {
+                EventBits_t bits = xEventGroupGetBits(s_boot_event_group);
+                if (bits & SENSORS_READY_BIT) {
+                    ESP_LOGI(TAG, "MAIN: ✓ Sensors ready (t=%ds) - waiting for provisioning", 
+                             provisioning_wait_seconds);
+                } else {
+                    ESP_LOGI(TAG, "MAIN: Sensors initializing (t=%ds) - provisioning in progress", 
+                             provisioning_wait_seconds);
+                }
+            }
         }
 
         ESP_LOGI(TAG, "MAIN: Provisioning completed, WiFi connected");
@@ -186,34 +223,46 @@ void app_main(void)
             idf_provisioning_stop();
         }
 
+        // Check if sensors completed during provisioning
+        EventBits_t bits = xEventGroupGetBits(s_boot_event_group);
+        if (bits & SENSORS_READY_BIT) {
+            ESP_LOGI(TAG, "MAIN: ✓ Sensors initialized during provisioning! (data already available)");
+        } else {
+            ESP_LOGI(TAG, "MAIN: Sensors still initializing...");
+        }
+
         connected = true;
     }
     
     // ========================================================================
-    // Phase 3: Launch Parallel Boot Tasks
+    // Phase 3: Launch Network Task (+ sensors if not already launched)
     // ========================================================================
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "MAIN: Launching parallel boot tasks");
+    ESP_LOGI(TAG, "MAIN: Launching network services");
     ESP_LOGI(TAG, "========================================");
     
-    // Launch sensor task (higher priority - user facing)
-    BaseType_t task_ret = xTaskCreate(
-        sensor_task,
-        "sensor_task",
-        SENSOR_TASK_STACK_SIZE,
-        NULL,
-        SENSOR_TASK_PRIORITY,
-        NULL
-    );
-    
-    if (task_ret != pdPASS) {
-        ESP_LOGE(TAG, "MAIN: Failed to create sensor task");
-    } else {
-        ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+    // Launch sensor task if not already launched during provisioning
+    // (This handles the case where credentials existed and provisioning was skipped)
+    if (!sensor_task_launched) {
+        ESP_LOGI(TAG, "MAIN: Launching sensor task now...");
+        BaseType_t task_ret = xTaskCreate(
+            sensor_task,
+            "sensor_task",
+            SENSOR_TASK_STACK_SIZE,
+            NULL,
+            SENSOR_TASK_PRIORITY,
+            NULL
+        );
+        
+        if (task_ret != pdPASS) {
+            ESP_LOGE(TAG, "MAIN: Failed to create sensor task");
+        } else {
+            ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+        }
     }
     
     // Launch network task (lower priority - background)
-    task_ret = xTaskCreate(
+    BaseType_t task_ret = xTaskCreate(
         network_task,
         "network_task",
         NETWORK_TASK_STACK_SIZE,

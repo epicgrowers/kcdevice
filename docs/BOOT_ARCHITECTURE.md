@@ -16,6 +16,805 @@ This document describes the parallel boot architecture for the KannaCloud device
 
 ---
 
+## Phase 0: WiFi Provisioning (First Boot Only)
+
+### When Does Provisioning Occur?
+
+WiFi provisioning over BLE is a **prerequisite phase** that runs **before** the parallel boot architecture. It only occurs when:
+- First boot (no WiFi credentials in NVS)
+- WiFi credentials cleared (short press reset button)
+- Stored credentials invalid (network changed, wrong password)
+
+If valid WiFi credentials exist in NVS, this phase is **completely skipped** and the device proceeds directly to parallel boot.
+
+---
+
+### Provisioning Flow
+
+#### Step 1: Boot & Credential Check (0-2s)
+```c
+[0-2s] Device Powers On
+├─ Initialize NVS flash
+├─ Initialize provisioning state machine
+├─ Initialize WiFi manager
+├─ Check NVS for stored WiFi credentials
+│
+└─ Decision Point:
+    ├─ Credentials exist? → Skip to Step 7 (Parallel Boot)
+    └─ No credentials?    → Continue to Step 2 (BLE Provisioning)
+```
+
+**NVS Storage**:
+- Namespace: `wifi_config`
+- Keys: `ssid`, `password`, `provisioned` flag
+- Encrypted if flash encryption enabled
+
+---
+
+#### Step 2: Start BLE Provisioning + Launch Sensors (2-3s)
+```c
+[2-3s] Initialize BLE Provisioning + Parallel Sensor Init
+├─ Launch SENSOR_TASK (Priority 5 - High) ← NEW!
+│   ├─ Task runs in parallel during provisioning wait
+│   ├─ Stack: 4KB
+│   └─ Will initialize sensors while waiting for mobile app
+│
+├─ Call idf_provisioning_start()
+├─ Initialize ESP-IDF provisioning manager
+│   ├─ Transport: BLE (wifi_prov_scheme_ble)
+│   ├─ Security: Security 1 (X25519 key exchange)
+│   ├─ Proof-of-Possession: "sumppop"
+│   └─ Service name: "kc-<MAC[3..5]>" (e.g., "kc-12ABCD")
+│
+├─ Start BLE advertising
+├─ Set state: PROV_STATE_BLE_CONNECTED
+└─ Log: "Provisioning started (service kc-XXXXXX)"
+
+NOTE: Sensor task runs independently in background!
+```
+
+**BLE Configuration**:
+- Mode: GATT Server
+- Advertising name: `kc-<last 3 MAC bytes>`
+- Security: Encrypted session with PoP verification
+- Characteristics: Standard ESP-IDF provisioning UUIDs
+
+---
+
+#### Step 3: Wait for Mobile App + Sensor Init in Background (3-60s)
+```c
+[3-60s] BLE Advertising Active + Sensors Initializing
+├─ MAIN TASK:
+│   ├─ Device advertises as "kc-XXXXXX"
+│   ├─ Waiting for mobile app to connect
+│   ├─ Status LED: Blinking (provisioning mode)
+│   └─ Block here - device cannot proceed without WiFi
+│
+└─ SENSOR TASK (running in parallel):
+    ├─ [3-6s] I2C stabilization (3 seconds)
+    ├─ [6-7s] Initial I2C scan
+    ├─ [7-10s] Initialize pH sensor (with retries)
+    ├─ [10-13s] Initialize EC sensor (with retries)
+    ├─ [13-16s] Initialize RTD sensor (with retries)
+    ├─ [16-19s] Initialize HUM sensor (with retries)
+    ├─ [19-20s] Initialize battery monitor
+    ├─ [20s] Final I2C scan and inventory
+    ├─ [20s] Start sensor reading loop
+    └─ [20s] Signal SENSORS_READY ✓
+
+User Actions (Mobile App):
+1. Open ESP BLE Provisioning app (or custom app)
+2. Scan for BLE devices with "kc-" prefix
+3. Select device (e.g., "kc-12ABCD")
+4. App initiates BLE connection
+
+WHILE USER IS DOING THIS, SENSORS ARE INITIALIZING!
+```
+
+**Timeout Behavior**:
+- No timeout - waits indefinitely
+- User can clear credentials and retry (reset button)
+- Device remains in provisioning mode until credentials received
+- **Sensors continue initializing regardless of provisioning progress**
+
+---
+
+#### Step 4: Security Handshake (60-62s)
+```c
+[60-62s] Security 1 Key Exchange
+├─ Mobile app requests security parameters
+├─ Device sends: Security 1 + PoP required
+├─ User enters PoP in app: "sumppop"
+├─ Perform X25519 key exchange
+├─ Verify Proof-of-Possession
+│   ├─ Success → Encrypted session established
+│   └─ Failure → Event: WIFI_PROV_CRED_FAIL
+│       └─ Log: "Wrong PoP, retry required"
+│       └─ Wait for app to retry
+│
+└─ Session secured, ready for credentials
+```
+
+**Security Details**:
+- Algorithm: X25519 Elliptic Curve Diffie-Hellman
+- Proof-of-Possession prevents unauthorized provisioning
+- All WiFi credentials encrypted over BLE
+- PoP stored in firmware: `kPop = "sumppop"`
+
+---
+
+#### Step 5: Credential Exchange (62-63s)
+```c
+[62-63s] Receive WiFi Credentials
+├─ Event: WIFI_PROV_CRED_RECV
+├─ State: PROV_STATE_CREDENTIALS_RECEIVED
+├─ Mobile app sends (encrypted):
+│   ├─ SSID: "MyNetwork"
+│   └─ Password: "MyPassword123"
+│
+├─ Provisioning manager receives credentials
+├─ Log: "Received Wi-Fi credentials for SSID: MyNetwork"
+└─ Proceed to WiFi connection test
+```
+
+**Data Format**:
+- Standard ESP-IDF provisioning protocol
+- Credentials encrypted with session key
+- Binary protobuf encoding
+
+---
+
+#### Step 6: WiFi Connection Test (63-75s)
+```c
+[63-75s] Validate Credentials
+├─ ESP-IDF provisioning manager handles WiFi connection
+├─ Configure WiFi station mode with received credentials
+├─ Attempt connection (3 attempts, ~10 seconds)
+│
+├─ Connection Progress:
+│   ├─ State: PROV_STATE_WIFI_CONNECTING
+│   ├─ Connect to Access Point
+│   ├─ Authenticate (WPA2/WPA3)
+│   ├─ Request DHCP lease
+│   └─ Receive IP address
+│
+└─ Result:
+    ├─ Success → Event: WIFI_PROV_CRED_SUCCESS
+    │   ├─ State: PROV_STATE_PROVISIONED
+    │   ├─ Save credentials to NVS (automatic by ESP-IDF)
+    │   ├─ Send success response to mobile app
+    │   └─ Log: "WiFi connected to SSID: MyNetwork"
+    │
+    └─ Failure → Event: WIFI_PROV_CRED_FAIL
+        ├─ State: PROV_STATE_WIFI_FAILED
+        ├─ Status codes:
+        │   ├─ STATUS_ERROR_WIFI_AUTH_FAILED (wrong password)
+        │   ├─ STATUS_ERROR_WIFI_NO_AP_FOUND (SSID not found)
+        │   └─ STATUS_ERROR_WIFI_TIMEOUT (AP not responding)
+        ├─ Send error to mobile app
+        ├─ Log: "WiFi connection failed: <reason>"
+        └─ Stay in provisioning mode, wait for retry
+```
+
+**WiFi Storage**:
+- Credentials saved to NVS by ESP-IDF (`WIFI_STORAGE_FLASH`)
+- Namespace: `nvs.net80211` (internal ESP-IDF namespace)
+- Encrypted if flash encryption enabled
+- Persistent across reboots
+
+---
+
+#### Step 7: Cleanup & Transition (75-77s)
+```c
+[75-77s] Provisioning Complete
+├─ Event: WIFI_PROV_END
+├─ Wait 2 seconds (ensure mobile app receives success)
+├─ Call idf_provisioning_stop()
+│   ├─ Stop provisioning manager
+│   ├─ Free BLE resources
+│   ├─ Free BTDM controller memory (~64KB)
+│   ├─ Unregister event handlers
+│   └─ Stop BLE advertising
+│
+├─ WiFi remains connected
+├─ Sensors already operational! ✓
+├─ Log: "Provisioning complete, BLE stopped"
+└─ Proceed to Step 8 (Launch Network Task)
+```
+
+**Resource Reclamation**:
+- BLE stack freed (not needed after provisioning)
+- Memory available for network services
+- WiFi connection maintained
+- **Sensors already initialized and reading** (started in parallel at Step 2)
+
+---
+
+#### Step 8: Launch Network Task (77s+)
+```c
+[77s] Launch Network Services
+├─ WiFi credentials now in NVS ✓
+├─ WiFi connected ✓
+├─ BLE resources freed ✓
+├─ Sensors operational ✓ (already running since Step 2)
+│
+└─ Launch network task only:
+    └─ NETWORK_TASK (Priority 3 - Low)
+        ├─ Load credentials from NVS
+        ├─ Reconnect to WiFi if needed
+        └─ Continue with cloud provisioning
+```
+
+---
+
+### Provisioning State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE: Boot
+    IDLE --> BLE_CONNECTED: No credentials
+    BLE_CONNECTED --> CREDENTIALS_RECEIVED: App sends WiFi creds
+    CREDENTIALS_RECEIVED --> WIFI_CONNECTING: Test connection
+    WIFI_CONNECTING --> PROVISIONED: DHCP success
+    WIFI_CONNECTING --> WIFI_FAILED: Auth/timeout
+    WIFI_FAILED --> BLE_CONNECTED: Retry
+    PROVISIONED --> [*]: BLE cleanup, launch parallel boot
+```
+
+**State Definitions**:
+- `PROV_STATE_IDLE`: Waiting to start provisioning
+- `PROV_STATE_BLE_CONNECTED`: BLE advertising active
+- `PROV_STATE_CREDENTIALS_RECEIVED`: Credentials received from app
+- `PROV_STATE_WIFI_CONNECTING`: Testing WiFi connection
+- `PROV_STATE_WIFI_FAILED`: Connection failed, wait for retry
+- `PROV_STATE_PROVISIONED`: Success, credentials saved
+
+---
+
+### Timeline Comparison
+
+#### First Boot Timeline (No Credentials) - WITH PARALLEL SENSORS ✨
+```
+Time  | Main/Provisioning                    | Sensor Task (Parallel)           | Result
+------|--------------------------------------|----------------------------------|------------------
+0s    | Power on, check NVS                  | -                                | No credentials
+2s    | Start BLE provisioning               | Launch sensor_task               | Both start
+3s    | Advertising as "kc-XXXXXX"           | Wait for I2C stabilization       | Parallel init
+3-6s  | Wait for mobile app...               | I2C stabilization (3s)           | Working...
+6s    | Still waiting...                     | Initial I2C scan                 | Working...
+7-10s | Still waiting...                     | Initialize pH sensor             | Working...
+10-13s| Still waiting...                     | Initialize EC sensor             | Working...
+13-16s| Still waiting...                     | Initialize RTD sensor            | Working...
+16-19s| Still waiting...                     | Initialize HUM sensor            | Working...
+19-20s| Still waiting...                     | Initialize battery monitor       | Working...
+20s   | Still waiting...                     | SENSORS_READY ✓ Reading loop!    | Data flowing!
+60s   | App connects                         | Sensors reading (loop active)    | Data available
+61s   | Security handshake (X25519 + PoP)    | Sensors reading                  | Data available
+62s   | Receive WiFi credentials             | Sensors reading                  | Data available
+63s   | Test WiFi connection                 | Sensors reading                  | Data available
+70s   | WiFi connected, DHCP success         | Sensors reading                  | Data available
+73s   | Save credentials to NVS              | Sensors reading                  | Data available
+75s   | Send success to mobile app           | Sensors reading                  | Data available
+77s   | Stop BLE, free resources             | Sensors reading                  | Data available
+77s   | Launch NETWORK_TASK                  | Sensors reading                  | Network starts
+97s   | Network ready (MQTT + HTTPS)         | Sensors reading                  | FULLY OPERATIONAL
+------|--------------------------------------|----------------------------------|------------------
+Total: 97 seconds (same), but sensors ready at 20s (not 97s)!
+Time to sensor data: 20 seconds (vs 97 seconds previously)
+```
+
+**First Boot Breakdown - New Architecture**:
+- **Provisioning: 75 seconds** (dominated by user interaction)
+- **Sensor Init: 20 seconds** (parallel with provisioning, done by t=20s)
+- **Network Init: 20 seconds** (starts after provisioning at t=77s)
+- **Total: ~97 seconds** to fully operational
+- **BUT**: Sensors operational at **20 seconds** (77 seconds earlier!)
+
+---
+
+#### Subsequent Boot Timeline (Credentials Exist)
+```
+Time  | Phase                                | Status
+------|--------------------------------------|----------------------------------------
+0s    | Power on, check NVS                  | Credentials found ✓
+1s    | Skip BLE provisioning                | Credentials valid
+2s    | Launch SENSOR_TASK                   | Sensor init begins
+2s    | Launch NETWORK_TASK                  | WiFi connecting...
+5s    | WiFi connected (fast)                | Using stored credentials
+5-10s | Cloud provisioning                   | Load certs from NVS (fast path)
+10s   | MQTT client started                  | Connected to broker
+12s   | HTTPS server started                 | Dashboard available
+14s   | mDNS started                         | https://kc.local live
+14s   | Network ready                        | NETWORK_READY ✓
+22s   | Sensors ready                        | SENSORS_READY ✓
+------|--------------------------------------|----------------------------------------
+Total: 22 seconds (no provisioning needed)
+```
+
+**Subsequent Boot Breakdown**:
+- **Provisioning: 0 seconds** (skipped)
+- **Parallel Boot: 22 seconds** (sensors + network)
+- **Total: ~22 seconds** to fully operational
+
+**Speed Improvement**: 75% faster (75s saved by skipping provisioning)
+
+---
+
+#### Invalid Credentials Timeline (Network Changed)
+```
+Time  | Phase                                | Status
+------|--------------------------------------|----------------------------------------
+0s    | Power on, check NVS                  | Credentials found
+1s    | Skip BLE provisioning (assumed valid)| Stored creds loaded
+2s    | Launch parallel boot                 | SENSOR_TASK + NETWORK_TASK
+2-12s | Network task tries WiFi              | Connection timeout (wrong password)
+12s   | WiFi connection failed               | STATUS_ERROR_WIFI_AUTH_FAILED
+13s   | Clear credentials from NVS           | Trigger reprovisioning
+14s   | Restart device                       | esp_restart()
+15s   | Reboot - check NVS                   | No credentials (cleared)
+17s   | Start BLE provisioning               | Advertising "kc-XXXXXX"
+17-75s| User reprovisions                    | New credentials received
+90s   | WiFi connected with new creds        | Saved to NVS
+92s   | Launch parallel boot                 | Now successful
+112s  | Fully operational                    | All services running
+------|--------------------------------------|----------------------------------------
+Total: 112 seconds (includes failed attempt + reprovisioning)
+```
+
+**Invalid Credentials Breakdown**:
+- **Failed Connection Attempt: 14 seconds**
+- **Reboot: 1 second**
+- **Reprovisioning: 58 seconds**
+- **Parallel Boot: 22 seconds**
+- **Total: ~112 seconds** (worst case)
+
+---
+
+### User Interaction Points
+
+#### During First Boot:
+1. **Scan for Device** (~30s): User opens app, scans for "kc-XXXXXX"
+2. **Enter PoP** (~10s): User types "sumppop"
+3. **Enter WiFi Credentials** (~20s): User selects SSID, enters password
+4. **Wait for Success** (~15s): Device tests connection, saves credentials
+
+**Total User Time**: ~75 seconds (varies by user speed)
+
+#### Reset Credentials:
+- **Short press GPIO0 button**: Clears WiFi credentials, reboots into provisioning mode
+- **Long press GPIO0 button**: Full factory reset (NVS erase)
+
+---
+
+### Provisioning Files
+
+| File | Purpose |
+|------|---------|
+| `main/idf_provisioning.c/.h` | Wrapper around ESP-IDF provisioning manager |
+| `main/provisioning_state.c/.h` | State machine for tracking provisioning progress |
+| `main/wifi_manager.c/.h` | WiFi connection management, NVS storage |
+| `main/reset_button.c/.h` | GPIO button handler for credential clearing |
+| `docs/KOTLIN_INTEGRATION.md` | Mobile app integration guide |
+| `docs/README.md` | Detailed provisioning architecture |
+
+---
+
+### Logging Examples
+
+#### First Boot (Provisioning):
+```
+I (0) MAIN: ========================================
+I (0) MAIN: KannaCloud Device - First Boot
+I (0) MAIN: ========================================
+I (100) MAIN: Initializing NVS...
+I (200) WIFI_MGR: No stored WiFi credentials
+I (210) MAIN: Starting BLE provisioning...
+I (300) idf_prov: Provisioning started (service kc-12ABCD)
+I (310) PROV_STATE: State: BLE_CONNECTED - BLE ready
+... [60 seconds waiting for user] ...
+I (60500) idf_prov: Received Wi-Fi credentials for SSID: MyNetwork
+I (60510) PROV_STATE: State: CREDENTIALS_RECEIVED
+I (62000) PROV_STATE: State: WIFI_CONNECTING
+I (70000) WIFI_MGR: WiFi connected, IP: 192.168.1.100
+I (73000) idf_prov: WiFi connected to SSID: MyNetwork (saved)
+I (75000) PROV_STATE: State: PROVISIONED
+I (77000) idf_prov: Provisioning complete, BLE stopped
+I (77100) MAIN: Launching parallel boot tasks...
+```
+
+#### Subsequent Boot (Skip Provisioning):
+```
+I (0) MAIN: ========================================
+I (0) MAIN: KannaCloud Device - Normal Boot
+I (0) MAIN: ========================================
+I (100) MAIN: Initializing NVS...
+I (200) WIFI_MGR: Found stored credentials for SSID: MyNetwork
+I (210) MAIN: Skipping provisioning (credentials exist)
+I (220) MAIN: Launching parallel boot tasks...
+I (230) NETWORK: Connecting to WiFi...
+I (2200) NETWORK: WiFi connected, IP: 192.168.1.100
+```
+
+---
+
+### Key Takeaways
+
+1. **Provisioning is a one-time gate**: Required on first boot, skipped thereafter
+2. **User interaction is the bottleneck**: ~60 seconds for user to provision
+3. **Subsequent boots are fast**: 22 seconds (no provisioning needed)
+4. **Credentials persist**: Stored in NVS, encrypted, survive reboots
+5. **Graceful recovery**: Invalid credentials trigger automatic reprovisioning
+6. **Security by default**: X25519 + PoP prevents unauthorized provisioning
+7. **Resource efficient**: BLE stack freed after provisioning (saves ~64KB RAM)
+8. **⭐ Parallel sensor init**: Sensors ready in 20s (while waiting for user during provisioning)
+9. **⭐ Instant data**: Dashboard shows sensor data immediately after provisioning completes
+
+---
+
+## Implementation: Parallel Sensor Init During Provisioning
+
+### Code Changes Required
+
+#### 1. Update `main/main.c` - Launch Sensors During Provisioning
+
+**Current Code** (lines 130-180):
+```c
+// Start BLE provisioning if not connected
+if (!connected) {
+    const char *service_name = idf_provisioning_get_service_name();
+    ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
+
+    ret = idf_provisioning_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    // Wait for provisioning to complete
+    while (idf_provisioning_is_running()) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    ESP_LOGI(TAG, "MAIN: Provisioning completed, WiFi connected");
+    if (idf_provisioning_is_running()) {
+        idf_provisioning_stop();
+    }
+
+    connected = true;
+}
+
+// ========================================================================
+// Phase 3: Launch Parallel Boot Tasks
+// ========================================================================
+ESP_LOGI(TAG, "========================================");
+ESP_LOGI(TAG, "MAIN: Launching parallel boot tasks");
+ESP_LOGI(TAG, "========================================");
+
+// Launch sensor task (higher priority - user facing)
+BaseType_t task_ret = xTaskCreate(
+    sensor_task,
+    "sensor_task",
+    SENSOR_TASK_STACK_SIZE,
+    NULL,
+    SENSOR_TASK_PRIORITY,
+    NULL
+);
+```
+
+**NEW Code** (proposed):
+```c
+// Start BLE provisioning if not connected
+if (!connected) {
+    const char *service_name = idf_provisioning_get_service_name();
+    ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
+
+    // ⭐ NEW: Launch sensor task BEFORE waiting for provisioning
+    ESP_LOGI(TAG, "MAIN: Launching sensor task during provisioning...");
+    BaseType_t task_ret = xTaskCreate(
+        sensor_task,
+        "sensor_task",
+        SENSOR_TASK_STACK_SIZE,
+        NULL,
+        SENSOR_TASK_PRIORITY,
+        NULL
+    );
+    
+    if (task_ret != pdPASS) {
+        ESP_LOGW(TAG, "MAIN: Failed to create sensor task");
+    } else {
+        ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+    }
+
+    ret = idf_provisioning_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    // Wait for provisioning to complete (sensors initializing in parallel)
+    ESP_LOGI(TAG, "MAIN: Waiting for provisioning (sensors init in background)...");
+    while (idf_provisioning_is_running()) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    ESP_LOGI(TAG, "MAIN: Provisioning completed, WiFi connected");
+    if (idf_provisioning_is_running()) {
+        idf_provisioning_stop();
+    }
+
+    // Check if sensors are already ready
+    EventBits_t bits = xEventGroupGetBits(s_boot_event_group);
+    if (bits & SENSORS_READY_BIT) {
+        ESP_LOGI(TAG, "MAIN: ✓ Sensors already initialized during provisioning!");
+    } else {
+        ESP_LOGI(TAG, "MAIN: Sensors still initializing...");
+    }
+
+    connected = true;
+}
+
+// ========================================================================
+// Phase 3: Launch Network Task (sensors may already be running)
+// ========================================================================
+ESP_LOGI(TAG, "========================================");
+ESP_LOGI(TAG, "MAIN: Launching network task");
+ESP_LOGI(TAG, "========================================");
+
+// Only launch sensor task if not already launched during provisioning
+if (!connected || (xEventGroupGetBits(s_boot_event_group) & SENSORS_READY_BIT) == 0) {
+    // This handles the case where credentials existed (skipped provisioning)
+    // OR sensors haven't completed yet
+    BaseType_t task_ret = xTaskCreate(
+        sensor_task,
+        "sensor_task",
+        SENSOR_TASK_STACK_SIZE,
+        NULL,
+        SENSOR_TASK_PRIORITY,
+        NULL
+    );
+    
+    if (task_ret != pdPASS) {
+        ESP_LOGE(TAG, "MAIN: Failed to create sensor task");
+    } else {
+        ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+    }
+}
+```
+
+**Summary of Changes**:
+- Move sensor task creation **inside** the `if (!connected)` block
+- Launch sensors **before** `idf_provisioning_start()`
+- Add conditional check to prevent duplicate sensor task creation
+- Add logging to show when sensors complete during provisioning
+
+---
+
+#### 2. Update Logging to Show Parallel Progress
+
+**Add to `main/main.c` provisioning wait loop**:
+```c
+// Wait for provisioning to complete (sensors initializing in parallel)
+ESP_LOGI(TAG, "MAIN: Waiting for provisioning (sensors init in background)...");
+int provisioning_wait_seconds = 0;
+while (idf_provisioning_is_running()) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    provisioning_wait_seconds++;
+    
+    // Check and log sensor progress every 10 seconds
+    if (provisioning_wait_seconds % 10 == 0) {
+        EventBits_t bits = xEventGroupGetBits(s_boot_event_group);
+        if (bits & SENSORS_READY_BIT) {
+            ESP_LOGI(TAG, "MAIN: ✓ Sensors ready (t=%ds) - still waiting for provisioning", 
+                     provisioning_wait_seconds);
+        } else {
+            ESP_LOGI(TAG, "MAIN: Sensors initializing (t=%ds) - provisioning in progress", 
+                     provisioning_wait_seconds);
+        }
+    }
+}
+```
+
+---
+
+### Memory Profiling: ESP32-C6 Analysis
+
+#### Memory Usage During Provisioning + Sensor Init
+
+**Components Active Simultaneously**:
+1. **BLE Stack**: ~64KB (BTDM controller + GAP/GATT)
+2. **WiFi Provisioning Manager**: ~12KB (state machine, buffers)
+3. **Sensor Task**: ~4KB stack + I2C driver ~8KB
+4. **Total Concurrent**: ~88KB
+
+#### ESP32-C6 Memory Constraints
+
+**Total SRAM**: 512KB
+- Heap available after boot: ~380KB (depends on config)
+- **Required for provisioning + sensors**: ~88KB
+- **Remaining heap**: ~292KB
+- **Status**: ✅ **SAFE** - plenty of headroom
+
+#### ESP32-S3 Memory Constraints
+
+**Total SRAM**: 512KB (but more configurable)
+- Heap available after boot: ~400KB (typical)
+- **Required for provisioning + sensors**: ~88KB
+- **Remaining heap**: ~312KB
+- **Status**: ✅ **VERY SAFE** - abundant headroom
+
+---
+
+### Memory Profiling Code
+
+Add this to `main/main.c` to monitor memory usage:
+
+```c
+// Add at top of file
+#include "esp_heap_caps.h"
+
+// Add function for memory reporting
+static void log_memory_usage(const char *location) {
+    size_t free_heap = esp_get_free_heap_size();
+    size_t min_free_heap = esp_get_minimum_free_heap_size();
+    size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t total_internal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "MEMORY USAGE @ %s", location);
+    ESP_LOGI(TAG, "  Free heap:        %u bytes (%.1f KB)", 
+             free_heap, free_heap / 1024.0);
+    ESP_LOGI(TAG, "  Min free heap:    %u bytes (%.1f KB)", 
+             min_free_heap, min_free_heap / 1024.0);
+    ESP_LOGI(TAG, "  Internal free:    %u / %u bytes (%.1f%%)", 
+             free_internal, total_internal, 
+             (free_internal * 100.0) / total_internal);
+    ESP_LOGI(TAG, "========================================");
+}
+
+// Call at key points in app_main():
+void app_main(void) {
+    // ... initialization ...
+    
+    log_memory_usage("After basic init");
+    
+    // Start provisioning
+    if (!connected) {
+        log_memory_usage("Before provisioning + sensors");
+        
+        // Launch sensor task
+        xTaskCreate(sensor_task, ...);
+        
+        // Start BLE provisioning
+        idf_provisioning_start();
+        
+        log_memory_usage("During provisioning + sensors");
+        
+        // Wait for provisioning
+        while (idf_provisioning_is_running()) {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            log_memory_usage("Provisioning wait");
+        }
+        
+        log_memory_usage("After provisioning (before BLE cleanup)");
+        idf_provisioning_stop();
+        log_memory_usage("After BLE cleanup");
+    }
+    
+    // Launch network task
+    log_memory_usage("Before network task");
+    xTaskCreate(network_task, ...);
+    log_memory_usage("After network task launch");
+}
+```
+
+---
+
+### Expected Memory Profile (ESP32-C6)
+
+```
+========================================
+MEMORY USAGE @ After basic init
+  Free heap:        380 KB
+  Min free heap:    380 KB
+  Internal free:    380 / 512 KB (74.2%)
+========================================
+
+========================================
+MEMORY USAGE @ Before provisioning + sensors
+  Free heap:        370 KB
+  Min free heap:    370 KB
+  Internal free:    370 / 512 KB (72.3%)
+========================================
+
+========================================
+MEMORY USAGE @ During provisioning + sensors
+  Free heap:        282 KB   ← BLE (64KB) + Provisioning (12KB) + Sensors (12KB) active
+  Min free heap:    282 KB
+  Internal free:    282 / 512 KB (55.1%)
+========================================
+
+========================================
+MEMORY USAGE @ After BLE cleanup
+  Free heap:        346 KB   ← BLE freed (64KB back)
+  Min free heap:    282 KB
+  Internal free:    346 / 512 KB (67.6%)
+========================================
+
+========================================
+MEMORY USAGE @ After network task launch
+  Free heap:        318 KB   ← Network stack (28KB TLS + MQTT)
+  Min free heap:    282 KB
+  Internal free:    318 / 512 KB (62.1%)
+========================================
+```
+
+**Analysis**:
+- **Lowest point**: 282KB free (55% of SRAM)
+- **Critical threshold**: <150KB free
+- **Safety margin**: 132KB (nearly 2x safety buffer)
+- **Conclusion**: ✅ **SAFE FOR ESP32-C6**
+
+---
+
+### Risk Assessment
+
+#### Potential Issues
+
+1. **Stack Overflow**
+   - **Risk**: Medium (if sensors take longer than expected)
+   - **Mitigation**: Sensor task has 4KB stack (sufficient for I2C operations)
+   - **Monitor**: Enable stack overflow detection in menuconfig
+
+2. **Heap Fragmentation**
+   - **Risk**: Low (components allocate/free in sequence)
+   - **Mitigation**: BLE freed before network allocates large buffers
+   - **Monitor**: Track `min_free_heap` - should stay above 200KB
+
+3. **I2C Bus Contention**
+   - **Risk**: Very Low (no other tasks use I2C during provisioning)
+   - **Mitigation**: Sensor task has exclusive I2C access
+   - **Monitor**: I2C errors in logs
+
+#### Safety Checks to Add
+
+```c
+// In app_main() before launching sensor task during provisioning
+size_t free_before = esp_get_free_heap_size();
+if (free_before < 200000) {  // Less than 200KB
+    ESP_LOGW(TAG, "MAIN: Low memory (%u bytes), skipping parallel sensor init", free_before);
+    ESP_LOGW(TAG, "MAIN: Will initialize sensors after BLE cleanup");
+    // Don't launch sensor task yet
+} else {
+    ESP_LOGI(TAG, "MAIN: Sufficient memory (%u bytes), launching sensors in parallel", 
+             free_before);
+    xTaskCreate(sensor_task, ...);
+}
+```
+
+---
+
+### Configuration for ESP32-C6
+
+**menuconfig settings** to optimize memory:
+
+```
+Component config → Bluetooth → Bluetooth controller → 
+  [*] Bluetooth controller mode (BR/EDR/BLE/DUALMODE)
+      → (X) BLE only  ← Use BLE only mode (saves ~20KB)
+
+Component config → Bluetooth → NimBLE Options →
+  (3) Maximum number of concurrent connections  ← Reduce from default 9
+  
+Component config → ESP32C6-Specific →
+  [*] Support for external, SPI-connected RAM
+      → [ ] Disable (use internal RAM only)
+
+Component config → FreeRTOS →
+  (1024) Minimum heap size  ← Increase safety threshold
+```
+
+---
+
 ## Architecture Overview
 
 ### Task Structure
@@ -23,6 +822,9 @@ This document describes the parallel boot architecture for the KannaCloud device
 ```
 MAIN TASK (Coordinator)
 ├─ Basic Hardware Init
+├─ WiFi Credential Check (Phase 0)
+│   ├─ If missing → BLE Provisioning (blocks 60-75s)
+│   └─ If present → Skip provisioning
 ├─ Launch SENSOR_TASK (Priority 5 - High)
 ├─ Launch NETWORK_TASK (Priority 3 - Low)
 └─ Wait for SENSORS_READY (network is optional)
