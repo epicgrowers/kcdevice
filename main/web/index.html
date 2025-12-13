@@ -107,6 +107,31 @@
 
 <div class='tab-content' id='tab-2' style='display:none'>
 <h2 class='text-xl font-bold text-gray-900 dark:text-white mb-4'>⚙️ Configuration</h2>
+
+<div class='mb-6 p-4 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg'>
+<h3 class='text-lg font-semibold text-gray-900 dark:text-white mb-3'>Device Identity</h3>
+<div class='mb-4'>
+<label class='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Device ID (Immutable)</label>
+<input type='text' id='device-id' placeholder='kc-3030f973c5cc' readonly
+class='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'>
+<p class='text-xs text-gray-500 dark:text-gray-400 mt-1'>Unique identifier based on MAC address (cannot be changed).</p>
+</div>
+<div class='mb-4'>
+<label class='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Device Name (Optional)</label>
+<input type='text' id='device-name' placeholder='e.g., Greenhouse #1' maxlength='64'
+class='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white'>
+<p class='text-xs text-gray-500 dark:text-gray-400 mt-1'>Human-readable name for this device (1-64 characters).</p>
+</div>
+<div class='flex gap-3'>
+<button onclick='saveDeviceName()' class='flex-1 bg-blue-600 dark:bg-blue-400 hover:bg-blue-700 dark:hover:bg-blue-500 text-white px-4 py-2 rounded-md font-medium'>
+<i class='fas fa-save'></i> Save Device Name
+</button>
+<button onclick='clearDeviceName()' class='flex-1 bg-gray-600 dark:bg-gray-500 hover:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-md font-medium'>
+<i class='fas fa-times'></i> Clear Name
+</button>
+</div>
+</div>
+
 <div class='mb-6 p-4 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg'>
 <h3 class='text-lg font-semibold text-gray-900 dark:text-white mb-3'>MQTT Telemetry Publishing</h3>
 <div class='mb-4'>

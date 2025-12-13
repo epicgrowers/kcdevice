@@ -63,7 +63,7 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 #define SENSOR_WS_URI          "/ws/sensors"
 
 #define SENSOR_WS_MAX_CLIENTS  4
-#define FOCUS_SAMPLE_INTERVAL_MS 2500
+#define FOCUS_SAMPLE_INTERVAL_MS 2000
 
 typedef struct {
     bool should_resume;
@@ -1212,6 +1212,108 @@ static esp_err_t api_sensors_resume_handler(httpd_req_t *req)
 }
 
 /**
+ * @brief GET /api/device/info - Get device ID and name
+ */
+static esp_err_t api_device_info_get_handler(httpd_req_t *req)
+{
+    char device_id[64];
+    char device_name[65];
+    
+    esp_err_t err = cloud_prov_get_device_id(device_id, sizeof(device_id));
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get device ID");
+        return ESP_FAIL;
+    }
+    
+    cloud_prov_get_device_name(device_name, sizeof(device_name));
+    
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "device_id", device_id);
+    cJSON_AddStringToObject(root, "device_name", device_name);
+    
+    char *json_str = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_str);
+    free(json_str);
+    
+    return ESP_OK;
+}
+
+/**
+ * @brief POST /api/device/name - Set device name
+ */
+static esp_err_t api_device_name_set_handler(httpd_req_t *req)
+{
+    char content[128];
+    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
+    if (ret <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+        return ESP_FAIL;
+    }
+    content[ret] = '\0';
+    
+    cJSON *root = cJSON_Parse(content);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+    
+    cJSON *device_name_json = cJSON_GetObjectItem(root, "device_name");
+    if (device_name_json == NULL || !cJSON_IsString(device_name_json)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing device_name field");
+        return ESP_FAIL;
+    }
+    
+    const char *device_name = device_name_json->valuestring;
+    
+    // Empty string means clear device name
+    esp_err_t err;
+    if (device_name[0] == '\0') {
+        err = cloud_prov_clear_device_name();
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Device name cleared");
+        }
+    } else {
+        err = cloud_prov_set_device_name(device_name);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Device name set: %s", device_name);
+        }
+    }
+    
+    cJSON_Delete(root);
+    
+    if (err != ESP_OK) {
+        if (err == ESP_ERR_INVALID_ARG) {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, 
+                "Invalid device name: must be 1-64 characters");
+        } else {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save device name");
+        }
+        return ESP_FAIL;
+    }
+    
+    // Return the new device name
+    char new_device_name[65];
+    cloud_prov_get_device_name(new_device_name, sizeof(new_device_name));
+    
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "saved");
+    cJSON_AddStringToObject(response, "device_name", new_device_name);
+    
+    char *json_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_str);
+    free(json_str);
+    
+    return ESP_OK;
+}
+
+/**
  * @brief GET /api/sensors - Get list of all sensors with their configurations
  */
 static esp_err_t api_sensors_list_handler(httpd_req_t *req)
@@ -1943,6 +2045,20 @@ static const httpd_uri_t api_settings_reset_uri = {
     .user_ctx = NULL
 };
 
+static const httpd_uri_t api_device_info_get_uri = {
+    .uri = "/api/device/info",
+    .method = HTTP_GET,
+    .handler = api_device_info_get_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_device_name_set_uri = {
+    .uri = "/api/device/name",
+    .method = HTTP_POST,
+    .handler = api_device_name_set_handler,
+    .user_ctx = NULL
+};
+
 static const httpd_uri_t api_sensors_list_uri = {
     .uri = "/api/sensors",
     .method = HTTP_GET,
@@ -2426,6 +2542,8 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_settings_get_uri);
     httpd_register_uri_handler(s_server, &api_settings_post_uri);
     httpd_register_uri_handler(s_server, &api_settings_reset_uri);
+    httpd_register_uri_handler(s_server, &api_device_info_get_uri);
+    httpd_register_uri_handler(s_server, &api_device_name_set_uri);
     httpd_register_uri_handler(s_server, &api_sensors_list_uri);
     httpd_register_uri_handler(s_server, &api_sensors_rescan_uri);
     httpd_register_uri_handler(s_server, &api_sensors_config_uri);

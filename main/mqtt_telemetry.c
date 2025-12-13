@@ -32,6 +32,7 @@ static TaskHandle_t s_publish_task_handle = NULL;
 static uint32_t s_publish_interval_sec = 10; // Default: 10 seconds between MQTT publishes
 static uint32_t s_mqtt_reconnects = 0;
 static char s_device_id[32] = {0};
+static char s_device_name[65] = {0};
 static char s_mqtt_ca_cert[CLOUD_PROV_MAX_CERT_SIZE] = {0}; // Static buffer for CA certificate
 
 // Forward declarations
@@ -221,6 +222,9 @@ static void mqtt_publish_task(void *arg)
         }
         
         cJSON_AddStringToObject(root, "device_id", s_device_id);
+        if (s_device_name[0] != '\0') {
+            cJSON_AddStringToObject(root, "device_name", s_device_name);
+        }
         
         // Add sensors
         cJSON *sensors = cJSON_CreateObject();
@@ -302,12 +306,16 @@ esp_err_t mqtt_client_init(const char *broker_uri, const char *username, const c
         s_publish_interval_sec = 10;
     }
     
-    // Get device ID from cloud provisioning
+    // Get device ID and name from cloud provisioning
     cloud_prov_get_device_id(s_device_id, sizeof(s_device_id));
+    cloud_prov_get_device_name(s_device_name, sizeof(s_device_name));
     
     ESP_LOGI(TAG, "Initializing MQTT client");
     ESP_LOGI(TAG, "Broker URI: %s", broker_uri);
     ESP_LOGI(TAG, "Device ID: %s", s_device_id);
+    if (s_device_name[0] != '\0') {
+        ESP_LOGI(TAG, "Device Name: %s", s_device_name);
+    }
     if (username) {
         ESP_LOGI(TAG, "Username: %s", username);
     }
@@ -565,6 +573,11 @@ esp_err_t mqtt_publish_kannacloud_data(const kannacloud_data_t *data)
     
     // Add device_id (required)
     cJSON_AddStringToObject(root, "device_id", data->device_id);
+    
+    // Add device_name if available
+    if (s_device_name[0] != '\0') {
+        cJSON_AddStringToObject(root, "device_name", s_device_name);
+    }
     
     // Add sensors object - read all EZO sensors dynamically
     cJSON *sensors = cJSON_CreateObject();

@@ -27,6 +27,10 @@ static const char *TAG = "CLOUD_PROV";
 #define NVS_KEY_CERT_ID "cert_id"
 #define NVS_KEY_MQTT_CA "mqtt_ca_cert"
 
+// Device name stored in settings namespace (main nvs partition)
+#define NVS_SETTINGS_NAMESPACE "settings"
+#define NVS_KEY_DEVICE_NAME "device_name"
+
 // Callback
 static cloud_prov_callback_t s_callback = NULL;
 
@@ -76,11 +80,120 @@ esp_err_t cloud_prov_get_device_id(char *id_out, size_t id_len)
         return ESP_ERR_INVALID_ARG;
     }
     
+    // Device ID is always MAC-based and immutable
     char mac_str[13];
     get_device_mac_string(mac_str, sizeof(mac_str));
-    snprintf(id_out, id_len, "esp32-%s", mac_str);
+    snprintf(id_out, id_len, "kc-%s", mac_str);
     
     return ESP_OK;
+}
+
+esp_err_t cloud_prov_get_device_name(char *name_out, size_t name_len)
+{
+    if (name_out == NULL || name_len < 65) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    name_out[0] = '\0'; // Default to empty string
+    
+    // Try to load custom device name from NVS
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_OK || err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        err = nvs_open(NVS_SETTINGS_NAMESPACE, NVS_READONLY, &nvs_handle);
+        if (err == ESP_OK) {
+            size_t required_size = name_len;
+            err = nvs_get_str(nvs_handle, NVS_KEY_DEVICE_NAME, name_out, &required_size);
+            nvs_close(nvs_handle);
+            
+            if (err == ESP_OK && name_out[0] != '\0') {
+                ESP_LOGI(TAG, "Using custom device name: %s", name_out);
+                return ESP_OK;
+            }
+        }
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t cloud_prov_set_device_name(const char *device_name)
+{
+    if (device_name == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Validate device name (1-64 chars)
+    size_t len = strlen(device_name);
+    if (len < 1 || len > 64) {
+        ESP_LOGE(TAG, "Device name must be 1-64 characters");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Initialize main NVS partition
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "Main NVS needs erase, erasing...");
+        nvs_flash_erase();
+        err = nvs_flash_init();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize main NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+    
+    // Open settings namespace
+    nvs_handle_t nvs_handle;
+    err = nvs_open(NVS_SETTINGS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS namespace '%s': %s", 
+                 NVS_SETTINGS_NAMESPACE, esp_err_to_name(err));
+        return err;
+    }
+    
+    // Save device name
+    err = nvs_set_str(nvs_handle, NVS_KEY_DEVICE_NAME, device_name);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write device name to NVS: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+    
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit device name to NVS: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+    
+    ESP_LOGI(TAG, "Device name saved: %s", device_name);
+    nvs_close(nvs_handle);
+    return ESP_OK;
+}
+
+esp_err_t cloud_prov_clear_device_name(void)
+{
+    ESP_LOGI(TAG, "Clearing device name");
+    
+    esp_err_t err = nvs_flash_init();
+    if (err != ESP_OK && err != ESP_ERR_NVS_NO_FREE_PAGES && err != ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        return err;
+    }
+    
+    nvs_handle_t nvs_handle;
+    err = nvs_open(NVS_SETTINGS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open settings namespace: %s", esp_err_to_name(err));
+        return err;
+    }
+    
+    err = nvs_erase_key(nvs_handle, NVS_KEY_DEVICE_NAME);
+    if (err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_commit(nvs_handle);
+        err = ESP_OK;
+    }
+    
+    nvs_close(nvs_handle);
+    return err;
 }
 
 bool cloud_prov_has_certificates(void)
