@@ -16,6 +16,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "time_sync.h"
 #include "api_key_manager.h"
 #include "web_file_editor.h"
+#include "mqtt_telemetry.h"
 #include "esp_https_server.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -1284,6 +1285,11 @@ static esp_err_t api_device_name_set_handler(httpd_req_t *req)
     }
     
     cJSON_Delete(root);
+    
+    // Notify MQTT module to refresh device name
+    if (err == ESP_OK) {
+        mqtt_refresh_device_name();
+    }
     
     if (err != ESP_OK) {
         if (err == ESP_ERR_INVALID_ARG) {

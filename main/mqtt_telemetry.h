@@ -73,6 +73,16 @@ typedef struct {
 } kannacloud_data_t;
 
 /**
+ * @brief Refresh device name from NVS
+ * 
+ * Called when device name is changed through the dashboard to update the cached value
+ * without restarting the device or MQTT connection.
+ * 
+ * @return ESP_OK on success, ESP_FAIL on error
+ */
+esp_err_t mqtt_refresh_device_name(void);
+
+/**
  * @brief Initialize MQTT client
  * 
  * Connects to MQTT broker specified in menuconfig

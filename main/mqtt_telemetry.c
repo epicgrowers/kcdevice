@@ -452,6 +452,29 @@ esp_err_t mqtt_client_start(void)
     return ESP_OK;
 }
 
+esp_err_t mqtt_refresh_device_name(void)
+{
+    // Fetch the updated device name from NVS
+    char new_device_name[65];
+    esp_err_t err = cloud_prov_get_device_name(new_device_name, sizeof(new_device_name));
+    
+    if (err == ESP_OK) {
+        // Update the cached device name
+        strncpy(s_device_name, new_device_name, sizeof(s_device_name) - 1);
+        s_device_name[sizeof(s_device_name) - 1] = '\0';
+        
+        if (s_device_name[0] != '\0') {
+            ESP_LOGI(TAG, "Device name updated: %s", s_device_name);
+        } else {
+            ESP_LOGI(TAG, "Device name cleared");
+        }
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG, "Failed to refresh device name: %s", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+}
+
 esp_err_t mqtt_client_stop(void)
 {
     if (s_mqtt_client == NULL) {
