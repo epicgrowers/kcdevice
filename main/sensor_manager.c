@@ -108,7 +108,7 @@ esp_err_t sensor_manager_init(void) {
     
     // Initialize EZO sensors
     // Scan for EZO sensors at known addresses (excluding 0x36 which is MAX17048)
-    uint8_t ezo_addresses[] = {0x16, 0x63, 0x64, 0x6F};
+    uint8_t ezo_addresses[] = {0x16, 0x63, 0x64, 0x66, 0x6F};  // Added 0x66 for RTD
     
     for (int i = 0; i < sizeof(ezo_addresses) && s_ezo_count < MAX_EZO_SENSORS; i++) {
         uint8_t addr = ezo_addresses[i];

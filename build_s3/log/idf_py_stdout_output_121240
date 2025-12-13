@@ -8253,4 +8253,1001 @@ iw==
 [0;32mI (3589829) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.350000381469727,"dew_point":8.56999969482422}},"rssi":-58}[0m
 [0;32mI (3589849) MQTT_CLIENT: ✓ MQTT data published successfully[0m
 [0;32mI (3591839) EZO_SENSOR: Sending command to 0x6F: R[0m
-[0;32mI (3592609) EZO_SEN
+[0;32mI (3592609) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.19,...[0m
+[0;32mI (3592629) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3592629) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3592629) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.350000381469727,"dew_point":8.56999969482422}},"rssi":-58}[0m
+[0;32mI (3592649) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3594639) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3595409) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.20,...[0m
+[0;32mI (3595429) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3595429) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3595429) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.200000762939453,"air_temp":22.350000381469727,"dew_point":8.5799999237060547}},"rssi":-59}[0m
+[0;32mI (3595449) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3597439) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3598209) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.19,...[0m
+[0;32mI (3598229) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3598229) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3598229) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-58}[0m
+[0;32mI (3598249) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3600239) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3601009) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.19,...[0m
+[0;32mI (3601029) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3601029) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3601029) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-58}[0m
+[0;32mI (3601049) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3603029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3603799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.18,...[0m
+[0;32mI (3603819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3603819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3603819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.180000305175781,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-58}[0m
+[0;32mI (3603839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3605829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3606599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.18,...[0m
+[0;32mI (3606619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3606619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3606619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.180000305175781,"air_temp":22.3700008392334,"dew_point":8.59000015258789}},"rssi":-58}[0m
+[0;32mI (3606639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3608629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3609399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.18,...[0m
+[0;32mI (3609419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3609419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3609419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.180000305175781,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-58}[0m
+[0;32mI (3609439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3611429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3612199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.26,...[0m
+[0;32mI (3612219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3612219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3612219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2599983215332,"air_temp":22.360000610351562,"dew_point":8.6099996566772461}},"rssi":-58}[0m
+[0;32mI (3612239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3614019) TIME_SYNC: ✓ Time synchronized: 2025-12-13 20:41:38[0m
+[0;32mI (3614019) MAIN: ====================================[0m
+[0;32mI (3614019) MAIN: Time Synchronized Successfully![0m
+[0;32mI (3614019) MAIN: Current time: 2025-12-13 20:41:38 UTC[0m
+[0;32mI (3614029) MAIN: ====================================[0m
+[0;32mI (3614229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3614999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.25,...[0m
+[0;32mI (3615019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3615019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3615019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.25,"air_temp":22.360000610351562,"dew_point":8.6099996566772461}},"rssi":-58}[0m
+[0;32mI (3615039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3617029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3617799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3617819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3617819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3617819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.360000610351562,"dew_point":8.6000003814697266}},"rssi":-58}[0m
+[0;32mI (3617839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3619829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3620599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.17,...[0m
+[0;32mI (3620619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3620619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3620619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.169998168945312,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-58}[0m
+[0;32mI (3620639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3622629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3623399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.16,...[0m
+[0;32mI (3623419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3623419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3623419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.1599998474121,"air_temp":22.3700008392334,"dew_point":8.5799999237060547}},"rssi":-57}[0m
+[0;32mI (3623439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3625429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3626199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.18,...[0m
+[0;32mI (3626219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3626219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3626219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.180000305175781,"air_temp":22.360000610351562,"dew_point":8.5799999237060547}},"rssi":-57}[0m
+[0;32mI (3626239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3628229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3628999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.22,...[0m
+[0;32mI (3629019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3629019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3629019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.220001220703125,"air_temp":22.3700008392334,"dew_point":8.6000003814697266}},"rssi":-58}[0m
+[0;32mI (3629039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3631029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3631799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.26,...[0m
+[0;32mI (3631819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3631819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3631819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2599983215332,"air_temp":22.3700008392334,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3631839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3633829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3634599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.28,...[0m
+[0;32mI (3634619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3634619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3634619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.279998779296875,"air_temp":22.350000381469727,"dew_point":8.6099996566772461}},"rssi":-58}[0m
+[0;32mI (3634639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3636629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3637399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.31,...[0m
+[0;32mI (3637419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3637419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3637419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.310001373291016,"air_temp":22.360000610351562,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3637439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3639429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3640199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.29,...[0m
+[0;32mI (3640219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3640219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3640219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.290000915527344,"air_temp":22.360000610351562,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3640239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3642229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3642999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.22,...[0m
+[0;32mI (3643019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3643019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3643019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.220001220703125,"air_temp":22.360000610351562,"dew_point":8.59000015258789}},"rssi":-58}[0m
+[0;32mI (3643039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3645029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3645799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.20,...[0m
+[0;32mI (3645819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3645819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3645819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.200000762939453,"air_temp":22.3799991607666,"dew_point":8.6099996566772461}},"rssi":-58}[0m
+[0;32mI (3645839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3647829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3648599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.17,...[0m
+[0;32mI (3648619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3648619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3648619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.169998168945312,"air_temp":22.3700008392334,"dew_point":8.59000015258789}},"rssi":-58}[0m
+[0;32mI (3648639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3650629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3651399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.13,...[0m
+[0;32mI (3651419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3651419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3651419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.130001068115234,"air_temp":22.3700008392334,"dew_point":8.56999969482422}},"rssi":-57}[0m
+[0;32mI (3651439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3653429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3654199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.20,...[0m
+[0;32mI (3654219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3654219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3654219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.200000762939453,"air_temp":22.360000610351562,"dew_point":8.59000015258789}},"rssi":-59}[0m
+[0;32mI (3654239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3656229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3656999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.32,...[0m
+[0;32mI (3657019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3657019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3657019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.319999694824219,"air_temp":22.360000610351562,"dew_point":8.63000011444092}},"rssi":-59}[0m
+[0;32mI (3657039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3659029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3659799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.54,...[0m
+[0;32mI (3659819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3659819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3659819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.540000915527344,"air_temp":22.3700008392334,"dew_point":8.72000026702881}},"rssi":-57}[0m
+[0;32mI (3659839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3661829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3662599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.49,...[0m
+[0;32mI (3662619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3662619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3662619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4900016784668,"air_temp":22.3700008392334,"dew_point":8.6999998092651367}},"rssi":-58}[0m
+[0;32mI (3662639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3664629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3665399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.42,...[0m
+[0;32mI (3665419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3665419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3665419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.419998168945312,"air_temp":22.3799991607666,"dew_point":8.6899995803833}},"rssi":-59}[0m
+[0;32mI (3665439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3667429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3668199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.47,...[0m
+[0;32mI (3668219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3668219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3668219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.470001220703125,"air_temp":22.3700008392334,"dew_point":8.6899995803833}},"rssi":-58}[0m
+[0;32mI (3668239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3670229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3670999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.47,...[0m
+[0;32mI (3671019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3671019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3671019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.470001220703125,"air_temp":22.3700008392334,"dew_point":8.6899995803833}},"rssi":-58}[0m
+[0;32mI (3671039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3673029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3673799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.55,...[0m
+[0;32mI (3673819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3673819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3673819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.549999237060547,"air_temp":22.3700008392334,"dew_point":8.72000026702881}},"rssi":-58}[0m
+[0;32mI (3673839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3675829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3676599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.54,...[0m
+[0;32mI (3676619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3676619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3676619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.540000915527344,"air_temp":22.3799991607666,"dew_point":8.72999954223633}},"rssi":-59}[0m
+[0;32mI (3676639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3678629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3679399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.55,...[0m
+[0;32mI (3679419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3679419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3679419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.549999237060547,"air_temp":22.3700008392334,"dew_point":8.72000026702881}},"rssi":-60}[0m
+[0;32mI (3679439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3681429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3682199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.54,...[0m
+[0;32mI (3682219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3682219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3682219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.540000915527344,"air_temp":22.3700008392334,"dew_point":8.72000026702881}},"rssi":-58}[0m
+[0;32mI (3682239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3684229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3684999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.38,...[0m
+[0;32mI (3685019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3685019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3685019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.380001068115234,"air_temp":22.3700008392334,"dew_point":8.65999984741211}},"rssi":-58}[0m
+[0;32mI (3685039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3687029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3687799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3687819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3687819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3687819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.3799991607666,"dew_point":8.61999988555908}},"rssi":-59}[0m
+[0;32mI (3687839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3689829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3690599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.27,...[0m
+[0;32mI (3690619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3690619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3690619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.270000457763672,"air_temp":22.3700008392334,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3690639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3692629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3693399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.35,...[0m
+[0;32mI (3693419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3693419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3693419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.3499984741211,"air_temp":22.3700008392334,"dew_point":8.6499996185302734}},"rssi":-58}[0m
+[0;32mI (3693439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3695429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3696199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.49,...[0m
+[0;32mI (3696219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3696219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3696219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4900016784668,"air_temp":22.3700008392334,"dew_point":8.6999998092651367}},"rssi":-60}[0m
+[0;32mI (3696239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3697899) esp_https_server: performing session handshake[0m
+[0;32mI (3698249) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3698949) WEB_EDITOR: Loaded file: index.html (19340 bytes)[0m
+[0;32mI (3698949) HTTP_SERVER: Serving index.html from FATFS (19340 bytes)[0m
+[0;32mI (3699049) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.58,...[0m
+[0;32mI (3699059) esp_https_server: performing session handshake[0m
+[0;32mI (3699069) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3699069) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3699079) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.580001831054688,"air_temp":22.3700008392334,"dew_point":8.72999954223633}},"rssi":-58}[0m
+[0;32mI (3699089) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3700029) HTTP_SERVER: GET handler called for file: dashboard.css[0m
+[0;32mI (3700029) WEB_EDITOR: Loaded file: dashboard.css (2665 bytes)[0m
+[0;32mI (3700049) esp_https_server: performing session handshake[0m
+[0;32mI (3701069) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3701839) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.66,...[0m
+[0;32mI (3701859) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3701859) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3701859) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.6599998474121,"air_temp":22.3799991607666,"dew_point":8.77000045776367}},"rssi":-57}[0m
+[0;33mW (3701859) HTTP_SERVER: Failed to send WS frame to fd 59: ESP_ERR_INVALID_ARG[0m
+[0;32mI (3701879) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3701889) HTTP_SERVER: WS client removed (fd=59)[0m
+[0;33mW (3701899) HTTP_SERVER: Failed to send WS frame to fd 59: ESP_ERR_INVALID_ARG[0m
+[0;32mI (3701899) HTTP_SERVER: WS client removed (fd=59)[0m
+[0;33mW (3701909) HTTP_SERVER: Failed to send WS frame to fd 59: ESP_ERR_INVALID_ARG[0m
+[0;32mI (3701909) HTTP_SERVER: WS client removed (fd=59)[0m
+[0;32mI (3702919) esp_https_server: performing session handshake[0m
+[0;32mI (3703879) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3703969) HTTP_SERVER: WS client added (fd=59, slot=0)[0m
+[0;32mI (3704649) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.68,...[0m
+[0;32mI (3704669) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3704669) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3704669) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.680000305175781,"air_temp":22.3700008392334,"dew_point":8.77000045776367}},"rssi":-57}[0m
+[0;32mI (3704689) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3706669) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3707439) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.63,...[0m
+[0;32mI (3707459) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3707459) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3707459) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.630001068115234,"air_temp":22.389999389648438,"dew_point":8.77000045776367}},"rssi":-58}[0m
+[0;32mI (3707479) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3709459) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3710229) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.57,...[0m
+[0;32mI (3710249) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3710249) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3710249) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.569999694824219,"air_temp":22.3799991607666,"dew_point":8.7399997711181641}},"rssi":-57}[0m
+[0;32mI (3710269) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3712249) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3713019) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.46,...[0m
+[0;32mI (3713039) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3713039) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3713039) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.459999084472656,"air_temp":22.3700008392334,"dew_point":8.6899995803833}},"rssi":-59}[0m
+[0;32mI (3713059) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3715039) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3715809) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.53,...[0m
+[0;32mI (3715829) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3715829) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3715829) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.529998779296875,"air_temp":22.3700008392334,"dew_point":8.72000026702881}},"rssi":-57}[0m
+[0;32mI (3715849) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3717829) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3718599) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.57,...[0m
+[0;32mI (3718619) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3718619) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3718619) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.569999694824219,"air_temp":22.3799991607666,"dew_point":8.7399997711181641}},"rssi":-57}[0m
+[0;32mI (3718639) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3720619) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3721389) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.60,...[0m
+[0;32mI (3721409) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3721409) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3721409) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.5999984741211,"air_temp":22.3799991607666,"dew_point":8.75}},"rssi":-58}[0m
+[0;32mI (3721429) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3723409) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3724179) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.65,...[0m
+[0;32mI (3724199) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3724199) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3724209) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.6500015258789,"air_temp":22.3799991607666,"dew_point":8.77000045776367}},"rssi":-58}[0m
+[0;32mI (3724219) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3726209) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3726979) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.56,...[0m
+[0;32mI (3726999) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3726999) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3726999) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.560001373291016,"air_temp":22.3799991607666,"dew_point":8.7399997711181641}},"rssi":-58}[0m
+[0;32mI (3727019) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3728999) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3729769) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.51,...[0m
+[0;32mI (3729789) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3729789) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3729789) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.5099983215332,"air_temp":22.3700008392334,"dew_point":8.71000003814697}},"rssi":-58}[0m
+[0;32mI (3729809) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3731789) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3732559) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.42,...[0m
+[0;32mI (3732579) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3732579) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3732579) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.419998168945312,"air_temp":22.389999389648438,"dew_point":8.6999998092651367}},"rssi":-57}[0m
+[0;32mI (3732599) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3734579) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3735349) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.42,...[0m
+[0;32mI (3735369) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3735369) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3735369) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.419998168945312,"air_temp":22.3700008392334,"dew_point":8.68000030517578}},"rssi":-57}[0m
+[0;32mI (3735389) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3737369) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3738139) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.47,...[0m
+[0;32mI (3738159) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3738159) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3738159) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.470001220703125,"air_temp":22.3700008392334,"dew_point":8.6899995803833}},"rssi":-57}[0m
+[0;32mI (3738179) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3740159) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3740929) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.49,...[0m
+[0;32mI (3740949) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3740949) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3740949) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4900016784668,"air_temp":22.3799991607666,"dew_point":8.71000003814697}},"rssi":-57}[0m
+[0;32mI (3740969) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3742949) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3743719) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.42,...[0m
+[0;32mI (3743739) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3743739) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3743739) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.419998168945312,"air_temp":22.3799991607666,"dew_point":8.6899995803833}},"rssi":-58}[0m
+[0;32mI (3743759) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3745739) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3746509) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.39,...[0m
+[0;32mI (3746529) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3746529) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3746529) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.389999389648438,"air_temp":22.3799991607666,"dew_point":8.68000030517578}},"rssi":-58}[0m
+[0;32mI (3746549) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3748529) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3749299) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.42,...[0m
+[0;32mI (3749319) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3749319) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3749319) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.419998168945312,"air_temp":22.3700008392334,"dew_point":8.68000030517578}},"rssi":-57}[0m
+[0;32mI (3749339) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3751319) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3752089) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.44,...[0m
+[0;32mI (3752109) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3752109) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3752109) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.439998626708984,"air_temp":22.399999618530273,"dew_point":8.71000003814697}},"rssi":-57}[0m
+[0;32mI (3752129) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3754109) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3754879) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.44,...[0m
+[0;32mI (3754899) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3754899) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3754899) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.439998626708984,"air_temp":22.389999389648438,"dew_point":8.6999998092651367}},"rssi":-57}[0m
+[0;32mI (3754929) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3756899) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3757669) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.43,...[0m
+[0;32mI (3757689) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3757689) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3757689) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.430000305175781,"air_temp":22.3799991607666,"dew_point":8.6899995803833}},"rssi":-57}[0m
+[0;32mI (3757709) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3759689) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3760459) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.28,...[0m
+[0;32mI (3760479) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3760479) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3760479) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.279998779296875,"air_temp":22.3799991607666,"dew_point":8.6400003433227539}},"rssi":-57}[0m
+[0;32mI (3760499) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3762479) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3763249) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.27,...[0m
+[0;32mI (3763269) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3763269) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3763269) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.270000457763672,"air_temp":22.3700008392334,"dew_point":8.61999988555908}},"rssi":-57}[0m
+[0;32mI (3763289) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3765269) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3766039) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.30,...[0m
+[0;32mI (3766059) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3766059) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3766059) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.299999237060547,"air_temp":22.3799991607666,"dew_point":8.6400003433227539}},"rssi":-58}[0m
+[0;32mI (3766079) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3768059) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3768829) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.33,...[0m
+[0;32mI (3768849) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3768849) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3768849) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.330001831054688,"air_temp":22.3799991607666,"dew_point":8.6499996185302734}},"rssi":-57}[0m
+[0;32mI (3768869) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3770849) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3771619) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.38,...[0m
+[0;32mI (3771639) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3771639) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3771639) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.380001068115234,"air_temp":22.3799991607666,"dew_point":8.6700000762939453}},"rssi":-58}[0m
+[0;32mI (3771659) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3773639) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3774409) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.40,...[0m
+[0;32mI (3774429) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3774429) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3774429) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4000015258789,"air_temp":22.389999389648438,"dew_point":8.6899995803833}},"rssi":-57}[0m
+[0;32mI (3774449) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3776429) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3777199) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.46,...[0m
+[0;32mI (3777219) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3777219) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3777219) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.459999084472656,"air_temp":22.389999389648438,"dew_point":8.71000003814697}},"rssi":-57}[0m
+[0;32mI (3777239) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3779219) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3779989) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.50,...[0m
+[0;32mI (3780009) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3780009) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3780009) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.5,"air_temp":22.3799991607666,"dew_point":8.71000003814697}},"rssi":-57}[0m
+[0;32mI (3780029) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3782009) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3782779) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.49,...[0m
+[0;32mI (3782799) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3782799) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3782799) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4900016784668,"air_temp":22.389999389648438,"dew_point":8.72000026702881}},"rssi":-57}[0m
+[0;32mI (3782819) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3784799) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3785569) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.46,...[0m
+[0;32mI (3785589) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3785589) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3785589) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.459999084472656,"air_temp":22.3799991607666,"dew_point":8.6999998092651367}},"rssi":-57}[0m
+[0;32mI (3785609) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3787589) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3788359) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.45,...[0m
+[0;32mI (3788379) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3788379) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3788379) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.450000762939453,"air_temp":22.389999389648438,"dew_point":8.71000003814697}},"rssi":-58}[0m
+[0;32mI (3788399) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3790379) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3791149) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.39,...[0m
+[0;32mI (3791169) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3791169) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3791169) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.389999389648438,"air_temp":22.389999389648438,"dew_point":8.6899995803833}},"rssi":-57}[0m
+[0;32mI (3791189) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3793169) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3793939) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.35,...[0m
+[0;32mI (3793959) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3793959) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3793959) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.3499984741211,"air_temp":22.389999389648438,"dew_point":8.6700000762939453}},"rssi":-59}[0m
+[0;32mI (3793979) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3795959) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3796729) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.31,...[0m
+[0;32mI (3796749) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3796749) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3796749) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.310001373291016,"air_temp":22.389999389648438,"dew_point":8.65999984741211}},"rssi":-58}[0m
+[0;32mI (3796769) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3798749) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3799519) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3799539) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3799539) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3799539) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.3799991607666,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3799559) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3801539) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3802309) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.22,...[0m
+[0;32mI (3802329) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3802329) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3802329) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.220001220703125,"air_temp":22.389999389648438,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3802349) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3804329) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3805099) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3805119) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3805119) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3805119) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-59}[0m
+[0;32mI (3805139) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3807119) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3807889) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.25,...[0m
+[0;32mI (3807909) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3807909) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3807909) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.25,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3807929) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3809909) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3810679) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.26,...[0m
+[0;32mI (3810699) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3810699) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3810699) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2599983215332,"air_temp":22.389999389648438,"dew_point":8.6400003433227539}},"rssi":-57}[0m
+[0;32mI (3810719) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3812699) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3813469) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.29,...[0m
+[0;32mI (3813489) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3813489) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3813489) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.290000915527344,"air_temp":22.389999389648438,"dew_point":8.6499996185302734}},"rssi":-57}[0m
+[0;32mI (3813509) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3815489) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3816259) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.29,...[0m
+[0;32mI (3816279) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3816279) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3816279) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.290000915527344,"air_temp":22.389999389648438,"dew_point":8.6499996185302734}},"rssi":-58}[0m
+[0;32mI (3816299) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3818279) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3819049) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.24,...[0m
+[0;32mI (3819069) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3819069) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3819069) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2400016784668,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-59}[0m
+[0;32mI (3819089) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3821069) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3821839) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.17,...[0m
+[0;32mI (3821859) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3821859) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3821859) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.169998168945312,"air_temp":22.389999389648438,"dew_point":8.6099996566772461}},"rssi":-57}[0m
+[0;32mI (3821879) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3823859) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3824629) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.19,...[0m
+[0;32mI (3824649) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3824649) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3824649) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.389999389648438,"dew_point":8.6099996566772461}},"rssi":-59}[0m
+[0;32mI (3824669) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3826649) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3827419) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.22,...[0m
+[0;32mI (3827449) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3827449) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3827449) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.220001220703125,"air_temp":22.389999389648438,"dew_point":8.61999988555908}},"rssi":-60}[0m
+[0;32mI (3827469) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3829449) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3830219) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3830239) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3830239) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3830239) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3830259) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3832239) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3833009) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.24,...[0m
+[0;32mI (3833029) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3833029) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3833029) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2400016784668,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3833049) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3835029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3835799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3835819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3835819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3835819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-57}[0m
+[0;32mI (3835839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3837819) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3838589) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.24,...[0m
+[0;32mI (3838609) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3838609) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3838609) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2400016784668,"air_temp":22.399999618530273,"dew_point":8.6400003433227539}},"rssi":-59}[0m
+[0;32mI (3838629) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3840609) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3841379) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.23,...[0m
+[0;32mI (3841399) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3841399) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3841399) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.229999542236328,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3841419) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3843399) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3844169) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.21,...[0m
+[0;32mI (3844189) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3844189) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3844189) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.209999084472656,"air_temp":22.389999389648438,"dew_point":8.61999988555908}},"rssi":-58}[0m
+[0;32mI (3844209) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3846189) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3846959) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.18,...[0m
+[0;32mI (3846979) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3846979) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3846979) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.180000305175781,"air_temp":22.399999618530273,"dew_point":8.61999988555908}},"rssi":-57}[0m
+[0;32mI (3846999) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3848979) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3849749) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.14,...[0m
+[0;32mI (3849769) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3849769) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3849769) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.139999389648438,"air_temp":22.399999618530273,"dew_point":8.6099996566772461}},"rssi":-59}[0m
+[0;32mI (3849789) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3851769) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3852539) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.13,...[0m
+[0;32mI (3852559) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3852559) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3852559) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.130001068115234,"air_temp":22.399999618530273,"dew_point":8.6000003814697266}},"rssi":-58}[0m
+[0;32mI (3852579) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3854559) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3855329) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.13,...[0m
+[0;32mI (3855349) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3855349) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3855349) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.130001068115234,"air_temp":22.389999389648438,"dew_point":8.59000015258789}},"rssi":-57}[0m
+[0;32mI (3855369) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3857349) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3858119) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.19,...[0m
+[0;32mI (3858139) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3858139) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3858139) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.189998626708984,"air_temp":22.399999618530273,"dew_point":8.61999988555908}},"rssi":-57}[0m
+[0;32mI (3858159) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3860139) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3860909) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.20,...[0m
+[0;32mI (3860929) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3860929) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3860929) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.200000762939453,"air_temp":22.399999618530273,"dew_point":8.63000011444092}},"rssi":-59}[0m
+[0;32mI (3860949) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3862929) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3863699) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.24,...[0m
+[0;32mI (3863719) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3863719) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3863719) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.2400016784668,"air_temp":22.389999389648438,"dew_point":8.63000011444092}},"rssi":-58}[0m
+[0;32mI (3863739) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3865719) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3866489) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.33,...[0m
+[0;32mI (3866509) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3866509) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3866509) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.330001831054688,"air_temp":22.409999847412109,"dew_point":8.68000030517578}},"rssi":-57}[0m
+[0;32mI (3866529) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3868509) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3869279) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.40,...[0m
+[0;32mI (3869299) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3869299) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3869309) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.4000015258789,"air_temp":22.399999618530273,"dew_point":8.6999998092651367}},"rssi":-58}[0m
+[0;32mI (3869319) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3871309) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3872079) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.47,...[0m
+[0;32mI (3872099) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3872099) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3872099) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.470001220703125,"air_temp":22.399999618530273,"dew_point":8.72000026702881}},"rssi":-58}[0m
+[0;32mI (3872119) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3874099) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3874869) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.52,...[0m
+[0;32mI (3874889) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3874889) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3874889) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.520000457763672,"air_temp":22.399999618530273,"dew_point":8.7399997711181641}},"rssi":-58}[0m
+[0;32mI (3874909) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3876889) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3877659) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.62,...[0m
+[0;32mI (3877679) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3877679) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3877679) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.619998931884766,"air_temp":22.399999618530273,"dew_point":8.77000045776367}},"rssi":-58}[0m
+[0;32mI (3877699) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3879679) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3880449) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.84,...[0m
+[0;32mI (3880469) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3880469) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3880469) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.8400001525879,"air_temp":22.399999618530273,"dew_point":8.8500003814697266}},"rssi":-57}[0m
+[0;32mI (3880489) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3882469) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3883239) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.96,...[0m
+[0;32mI (3883259) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3883259) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3883259) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.959999084472656,"air_temp":22.409999847412109,"dew_point":8.8999996185302734}},"rssi":-60}[0m
+[0;32mI (3883279) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3885259) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3886029) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.00,...[0m
+[0;32mI (3886049) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3886049) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3886049) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42,"air_temp":22.399999618530273,"dew_point":8.90999984741211}},"rssi":-58}[0m
+[0;32mI (3886069) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3888049) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3888819) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.00,...[0m
+[0;32mI (3888839) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3888839) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3888839) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42,"air_temp":22.409999847412109,"dew_point":8.9200000762939453}},"rssi":-58}[0m
+[0;32mI (3888859) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3890839) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3891609) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.00,...[0m
+[0;32mI (3891629) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3891629) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3891629) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42,"air_temp":22.399999618530273,"dew_point":8.90999984741211}},"rssi":-57}[0m
+[0;32mI (3891649) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3893629) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3894399) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.98,...[0m
+[0;32mI (3894419) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3894419) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3894419) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.979999542236328,"air_temp":22.409999847412109,"dew_point":8.90999984741211}},"rssi":-58}[0m
+[0;32mI (3894439) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3896419) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3897189) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.95,...[0m
+[0;32mI (3897209) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3897209) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3897209) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.950000762939453,"air_temp":22.409999847412109,"dew_point":8.8999996185302734}},"rssi":-58}[0m
+[0;32mI (3897229) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3899209) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3899979) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.94,...[0m
+[0;32mI (3899999) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3899999) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3899999) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.939998626708984,"air_temp":22.409999847412109,"dew_point":8.8999996185302734}},"rssi":-58}[0m
+[0;32mI (3900019) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3901999) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3902769) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.94,...[0m
+[0;32mI (3902789) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3902789) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3902789) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.939998626708984,"air_temp":22.399999618530273,"dew_point":8.8900003433227539}},"rssi":-58}[0m
+[0;32mI (3902809) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3904789) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3905559) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.98,...[0m
+[0;32mI (3905579) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3905579) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3905579) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":41.979999542236328,"air_temp":22.409999847412109,"dew_point":8.90999984741211}},"rssi":-57}[0m
+[0;32mI (3905599) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3907579) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3908349) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.03,...[0m
+[0;32mI (3908369) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3908369) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3908369) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.029998779296875,"air_temp":22.399999618530273,"dew_point":8.9200000762939453}},"rssi":-57}[0m
+[0;32mI (3908389) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3910369) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3911139) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.10,...[0m
+[0;32mI (3911159) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3911159) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3911159) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.0999984741211,"air_temp":22.409999847412109,"dew_point":8.96000003814697}},"rssi":-57}[0m
+[0;32mI (3911179) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3913159) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3913929) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.20,...[0m
+[0;32mI (3913949) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3913949) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3913949) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.200000762939453,"air_temp":22.420000076293945,"dew_point":9}},"rssi":-57}[0m
+[0;32mI (3913969) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3915959) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3916729) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.32,...[0m
+[0;32mI (3916749) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3916749) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3916749) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.319999694824219,"air_temp":22.409999847412109,"dew_point":9.02999973297119}},"rssi":-58}[0m
+[0;32mI (3916769) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3918749) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3919519) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.30,...[0m
+[0;32mI (3919539) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3919539) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3919539) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.299999237060547,"air_temp":22.409999847412109,"dew_point":9.02999973297119}},"rssi":-57}[0m
+[0;32mI (3919559) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3921539) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3922309) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.27,...[0m
+[0;32mI (3922329) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3922329) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3922329) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.270000457763672,"air_temp":22.420000076293945,"dew_point":9.02000045776367}},"rssi":-57}[0m
+[0;32mI (3922349) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3924329) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3925099) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.26,...[0m
+[0;32mI (3925119) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3925119) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3925119) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.2599983215332,"air_temp":22.409999847412109,"dew_point":9.0100002288818359}},"rssi":-57}[0m
+[0;32mI (3925139) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3927119) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3927889) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.24,...[0m
+[0;32mI (3927909) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3927909) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3927909) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.2400016784668,"air_temp":22.409999847412109,"dew_point":9}},"rssi":-59}[0m
+[0;32mI (3927929) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3929909) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3930679) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.25,...[0m
+[0;32mI (3930699) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3930699) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3930699) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.25,"air_temp":22.409999847412109,"dew_point":9.0100002288818359}},"rssi":-55}[0m
+[0;32mI (3930719) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3932699) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3933469) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.36,...[0m
+[0;32mI (3933489) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3933489) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3933489) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.360000610351562,"air_temp":22.409999847412109,"dew_point":9.0500001907348633}},"rssi":-56}[0m
+[0;32mI (3933509) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3935489) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3936259) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.36,...[0m
+[0;32mI (3936279) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3936279) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3936279) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.360000610351562,"air_temp":22.399999618530273,"dew_point":9.03999996185303}},"rssi":-56}[0m
+[0;32mI (3936299) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3938279) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3939049) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.35,...[0m
+[0;32mI (3939069) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3939069) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3939069) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.3499984741211,"air_temp":22.430000305175781,"dew_point":9.0600004196167}},"rssi":-56}[0m
+[0;32mI (3939089) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3941069) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3941839) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.38,...[0m
+[0;32mI (3941859) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3941859) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3941859) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.380001068115234,"air_temp":22.409999847412109,"dew_point":9.0500001907348633}},"rssi":-56}[0m
+[0;32mI (3941879) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3943859) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3944629) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.38,...[0m
+[0;32mI (3944649) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3944649) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3944649) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.380001068115234,"air_temp":22.409999847412109,"dew_point":9.0500001907348633}},"rssi":-56}[0m
+[0;32mI (3944679) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3946649) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3947419) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.48,...[0m
+[0;32mI (3947439) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3947439) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3947439) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.479999542236328,"air_temp":22.409999847412109,"dew_point":9.09000015258789}},"rssi":-55}[0m
+[0;33mW (3947439) HTTP_SERVER: Failed to send WS frame to fd 59: ESP_ERR_INVALID_ARG[0m
+[0;32mI (3947459) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3947459) HTTP_SERVER: WS client removed (fd=59)[0m
+[0;32mI (3949439) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3950209) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.57,...[0m
+[0;32mI (3950229) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3950229) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3950229) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.569999694824219,"air_temp":22.409999847412109,"dew_point":9.11999988555908}},"rssi":-56}[0m
+[0;32mI (3950249) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3952229) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3952999) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.56,...[0m
+[0;32mI (3953019) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3953019) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3953019) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.560001373291016,"air_temp":22.409999847412109,"dew_point":9.11999988555908}},"rssi":-55}[0m
+[0;32mI (3953039) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3955019) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3955789) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.58,...[0m
+[0;32mI (3955809) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3955809) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3955809) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.580001831054688,"air_temp":22.420000076293945,"dew_point":9.13000011444092}},"rssi":-56}[0m
+[0;32mI (3955829) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3957809) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3958579) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.45,...[0m
+[0;32mI (3958599) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3958599) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3958599) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.450000762939453,"air_temp":22.409999847412109,"dew_point":9.0799999237060547}},"rssi":-55}[0m
+[0;32mI (3958619) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3960599) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3961369) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.41,...[0m
+[0;32mI (3961389) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3961389) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3961389) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.4099998474121,"air_temp":22.420000076293945,"dew_point":9.06999969482422}},"rssi":-55}[0m
+[0;32mI (3961409) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3963389) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3964159) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.41,...[0m
+[0;32mI (3964179) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3964179) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3964179) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.4099998474121,"air_temp":22.409999847412109,"dew_point":9.0600004196167}},"rssi":-55}[0m
+[0;32mI (3964199) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3966179) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3966949) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.42,...[0m
+[0;32mI (3966969) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3966969) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3966969) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.419998168945312,"air_temp":22.420000076293945,"dew_point":9.0799999237060547}},"rssi":-55}[0m
+[0;32mI (3966989) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3968969) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3969739) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.45,...[0m
+[0;32mI (3969759) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3969759) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3969759) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.450000762939453,"air_temp":22.409999847412109,"dew_point":9.0799999237060547}},"rssi":-55}[0m
+[0;32mI (3969779) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3971759) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3972529) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.51,...[0m
+[0;32mI (3972549) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3972549) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3972549) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5099983215332,"air_temp":22.430000305175781,"dew_point":9.11999988555908}},"rssi":-55}[0m
+[0;32mI (3972569) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3974549) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3975319) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.55,...[0m
+[0;32mI (3975339) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3975339) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3975339) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.549999237060547,"air_temp":22.430000305175781,"dew_point":9.13000011444092}},"rssi":-56}[0m
+[0;32mI (3975359) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3977339) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3978109) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.55,...[0m
+[0;32mI (3978129) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3978129) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3978129) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.549999237060547,"air_temp":22.420000076293945,"dew_point":9.11999988555908}},"rssi":-56}[0m
+[0;32mI (3978149) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3980129) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3980899) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.58,...[0m
+[0;32mI (3980919) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3980919) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3980929) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.580001831054688,"air_temp":22.420000076293945,"dew_point":9.13000011444092}},"rssi":-56}[0m
+[0;32mI (3980939) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3982919) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3983689) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.65,...[0m
+[0;32mI (3983709) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3983709) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3983709) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.6500015258789,"air_temp":22.430000305175781,"dew_point":9.1700000762939453}},"rssi":-55}[0m
+[0;32mI (3983729) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3985709) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3986479) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.69,...[0m
+[0;32mI (3986499) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3986499) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3986499) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.689998626708984,"air_temp":22.420000076293945,"dew_point":9.1700000762939453}},"rssi":-55}[0m
+[0;32mI (3986519) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3988499) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3989269) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.68,...[0m
+[0;32mI (3989289) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3989289) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3989289) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.680000305175781,"air_temp":22.430000305175781,"dew_point":9.18000030517578}},"rssi":-55}[0m
+[0;32mI (3989309) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3991289) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3992059) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.67,...[0m
+[0;32mI (3992079) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3992079) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3992079) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.669998168945312,"air_temp":22.440000534057617,"dew_point":9.18000030517578}},"rssi":-56}[0m
+[0;32mI (3992099) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3994079) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3994849) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.61,...[0m
+[0;32mI (3994869) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3994869) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3994869) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.610000610351562,"air_temp":22.420000076293945,"dew_point":9.1400003433227539}},"rssi":-55}[0m
+[0;32mI (3994889) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3996869) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (3997639) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.59,...[0m
+[0;32mI (3997659) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (3997659) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (3997659) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5900001525879,"air_temp":22.420000076293945,"dew_point":9.1400003433227539}},"rssi":-55}[0m
+[0;32mI (3997679) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (3999659) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4000429) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.60,...[0m
+[0;32mI (4000449) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4000449) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4000449) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5999984741211,"air_temp":22.430000305175781,"dew_point":9.1499996185302734}},"rssi":-56}[0m
+[0;32mI (4000469) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4002449) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4003219) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.58,...[0m
+[0;32mI (4003239) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4003239) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4003239) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.580001831054688,"air_temp":22.430000305175781,"dew_point":9.1400003433227539}},"rssi":-55}[0m
+[0;32mI (4003259) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4005239) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4006009) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.65,...[0m
+[0;32mI (4006029) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4006029) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4006029) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.6500015258789,"air_temp":22.409999847412109,"dew_point":9.1499996185302734}},"rssi":-55}[0m
+[0;32mI (4006049) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4008029) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4008799) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.66,...[0m
+[0;32mI (4008819) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4008819) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4008819) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.6599998474121,"air_temp":22.420000076293945,"dew_point":9.15999984741211}},"rssi":-55}[0m
+[0;32mI (4008839) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4010819) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4011589) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.62,...[0m
+[0;32mI (4011609) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4011609) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4011609) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.619998931884766,"air_temp":22.430000305175781,"dew_point":9.15999984741211}},"rssi":-57}[0m
+[0;32mI (4011629) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4013609) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4014379) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.59,...[0m
+[0;32mI (4014399) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4014399) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4014399) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5900001525879,"air_temp":22.430000305175781,"dew_point":9.1499996185302734}},"rssi":-56}[0m
+[0;32mI (4014419) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4016399) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4017169) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.58,...[0m
+[0;32mI (4017189) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4017189) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4017189) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.580001831054688,"air_temp":22.420000076293945,"dew_point":9.13000011444092}},"rssi":-55}[0m
+[0;32mI (4017209) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4019189) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4019959) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.59,...[0m
+[0;32mI (4019979) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4019979) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4019979) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5900001525879,"air_temp":22.430000305175781,"dew_point":9.1499996185302734}},"rssi":-55}[0m
+[0;32mI (4019999) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4021979) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4022749) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.62,...[0m
+[0;32mI (4022769) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4022769) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4022769) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.619998931884766,"air_temp":22.430000305175781,"dew_point":9.15999984741211}},"rssi":-55}[0m
+[0;32mI (4022789) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4024769) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4025539) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.61,...[0m
+[0;32mI (4025559) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4025559) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4025559) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.610000610351562,"air_temp":22.420000076293945,"dew_point":9.1400003433227539}},"rssi":-55}[0m
+[0;32mI (4025579) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4027559) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4028329) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.61,...[0m
+[0;32mI (4028359) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4028359) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4028359) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.610000610351562,"air_temp":22.430000305175781,"dew_point":9.1499996185302734}},"rssi":-55}[0m
+[0;32mI (4028379) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4030359) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4031129) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.61,...[0m
+[0;32mI (4031149) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4031149) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4031149) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.610000610351562,"air_temp":22.430000305175781,"dew_point":9.1499996185302734}},"rssi":-55}[0m
+[0;32mI (4031169) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4033149) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4033919) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.60,...[0m
+[0;32mI (4033939) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4033939) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4033939) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5999984741211,"air_temp":22.440000534057617,"dew_point":9.15999984741211}},"rssi":-56}[0m
+[0;32mI (4033959) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4035939) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4036709) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.61,...[0m
+[0;32mI (4036729) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4036729) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4036729) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.610000610351562,"air_temp":22.440000534057617,"dew_point":9.15999984741211}},"rssi":-56}[0m
+[0;32mI (4036749) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4038729) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4039499) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.59,...[0m
+[0;32mI (4039519) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4039519) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4039519) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5900001525879,"air_temp":22.420000076293945,"dew_point":9.1400003433227539}},"rssi":-56}[0m
+[0;32mI (4039539) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4041519) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4042289) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.59,...[0m
+[0;32mI (4042309) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4042309) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4042309) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"HUM":{"humidity":42.5900001525879,"air_temp":22.440000534057617,"dew_point":9.1499996185302734}},"rssi":-57}[0m
+[0;32mI (4042329) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (4044309) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (4045079) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.64,...[0m
+[0;32mI (4045099) SENSOR_MGR: ✓ Cache updated (1/1 sensors valid)[0m
+[0;32mI (4045099) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (4045099) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #1","sensors":{"H

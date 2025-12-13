@@ -6,6 +6,7 @@
 #include "chip_info.h"
 #include "esp_log.h"
 #include "esp_flash.h"
+#include "esp_psram.h"
 #include <string.h>
 
 static const char *TAG = "CHIP_INFO";
@@ -93,9 +94,13 @@ void chip_info_log(void)
     ESP_LOGI(TAG, "  - Bluetooth: %s", (chip_info.features & CHIP_FEATURE_BT) ? "Yes (Classic)" : "No");
     ESP_LOGI(TAG, "  - BLE:       %s", (chip_info.features & CHIP_FEATURE_BLE) ? "Yes" : "No");
     
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-    ESP_LOGI(TAG, "  - PSRAM:     %s", (chip_info.features & CHIP_FEATURE_EMB_PSRAM) ? "Yes (Embedded)" : "No");
-#endif
+    // Check for PSRAM (works for both embedded and external PSRAM)
+    size_t psram_size = esp_psram_get_size();
+    if (psram_size > 0) {
+        ESP_LOGI(TAG, "  - PSRAM:     Yes (%lu MB)", psram_size / (1024 * 1024));
+    } else {
+        ESP_LOGI(TAG, "  - PSRAM:     No");
+    }
 
 #ifdef CONFIG_IDF_TARGET_ESP32C6
     ESP_LOGI(TAG, "  - WiFi 6:    Yes (802.11ax)");

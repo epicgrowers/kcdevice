@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "chip_info.h"
@@ -20,21 +21,58 @@
 
 static const char *TAG = "MAIN";
 
-// Forward declarations
+// ============================================================================
+// Parallel Boot Configuration
+// ============================================================================
+
+// Timing Configuration
+#define I2C_STABILIZATION_DELAY_MS     3000   // Initial wait for sensor power-up
+#define SENSOR_INIT_RETRY_COUNT        5      // Attempts per sensor
+#define SENSOR_INIT_RETRY_DELAY_MS     3000   // Between retry attempts (3 seconds)
+#define SENSOR_INTER_INIT_DELAY_MS     1500   // Between different sensors (1.5 seconds)
+#define WIFI_CONNECT_TIMEOUT_MS        10000  // WiFi connection timeout (10 seconds)
+#define WIFI_RETRY_INTERVAL_MS         30000  // WiFi retry interval (30 seconds)
+#define CLOUD_PROVISION_RETRY_MS       60000  // Cloud provision retry (60 seconds)
+
+// Task Configuration
+#define SENSOR_TASK_STACK_SIZE         4096   // 4KB stack
+#define SENSOR_TASK_PRIORITY           5      // Higher priority - user facing
+#define NETWORK_TASK_STACK_SIZE        8192   // 8KB stack - TLS needs more
+#define NETWORK_TASK_PRIORITY          3      // Lower priority - background
+
+// Event Group Bits for Task Synchronization
+#define SENSORS_READY_BIT              BIT0   // Sensor task completed
+#define NETWORK_READY_BIT              BIT1   // Network task completed
+
+// Global event group for task synchronization
+static EventGroupHandle_t s_boot_event_group = NULL;
+
+// ============================================================================
+// Forward Declarations
+// ============================================================================
+
+// Boot tasks
+static void sensor_task(void *arg);
+static void network_task(void *arg);
+
+// Legacy provisioning handlers
 static void state_change_handler(provisioning_state_t state, provisioning_status_code_t status, const char* message);
 static void reset_button_handler(reset_button_event_t event, uint32_t press_duration_ms);
 static void time_sync_handler(bool synced, struct tm *current_time);
 static void cloud_prov_handler(bool success, const char *message);
+
+// Legacy function (will be refactored into tasks)
 static void start_cloud_services(void);
 
 /**
  * @brief Main application entry point
+ * Implements parallel boot architecture with sensor and network tasks
  */
 void app_main(void)
 {
-    ESP_LOGI(TAG, "=================================" );
-    ESP_LOGI(TAG, "KC-Device WiFi Provisioning");
-    ESP_LOGI(TAG, "=================================" );
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "KannaCloud Device - Parallel Boot v2.0");
+    ESP_LOGI(TAG, "========================================");
     
     // Enable verbose logging for provisioning components
     esp_log_level_set("wifi_prov_mgr", ESP_LOG_DEBUG);
@@ -44,45 +82,67 @@ void app_main(void)
     // Log chip information
     chip_info_log();
     
+    // ========================================================================
+    // Phase 1: Basic Hardware Initialization
+    // ========================================================================
+    ESP_LOGI(TAG, "MAIN: Initializing basic hardware...");
+    
     // Initialize security features (NVS encryption with eFuse protection)
     esp_err_t ret = security_init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Security initialization failed: %s", esp_err_to_name(ret));
-        ESP_LOGE(TAG, "Device will continue but credentials may not be secure!");
+        ESP_LOGE(TAG, "MAIN: Security initialization failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "MAIN: Device will continue but credentials may not be secure!");
     }
     
     // Initialize reset button (GPIO0 - BOOT button)
     ret = reset_button_init(RESET_BUTTON_GPIO, reset_button_handler);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize reset button: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "MAIN: Failed to initialize reset button: %s", esp_err_to_name(ret));
+    }
+    
+    // Initialize I2C bus hardware (required for sensors)
+    ESP_LOGI(TAG, "MAIN: Initializing I2C bus...");
+    ret = i2c_scanner_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MAIN: I2C bus initialization failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "MAIN: Restarting device (hardware issue)...");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        esp_restart();
     }
     
     // Initialize provisioning state machine
     provisioning_state_init();
-    
-    // Register state change callback
     provisioning_state_register_callback(state_change_handler);
     
+    // Create event group for task synchronization
+    s_boot_event_group = xEventGroupCreate();
+    if (s_boot_event_group == NULL) {
+        ESP_LOGE(TAG, "MAIN: Failed to create event group");
+        esp_restart();
+    }
+    
+    // ========================================================================
+    // Phase 2: WiFi Connection (Required for Network Services)
+    // ========================================================================
     bool connected = false;
-    bool cloud_started = false;
     char stored_ssid[33] = {0};
     char stored_password[64] = {0};
 
-    // Initialize WiFi first so we can check for stored credentials with WIFI_STORAGE_FLASH
-    ESP_LOGI(TAG, "Initializing WiFi manager...");
+    // Initialize WiFi
+    ESP_LOGI(TAG, "MAIN: Initializing WiFi manager...");
     ret = wifi_manager_init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize WiFi manager");
+        ESP_LOGE(TAG, "MAIN: Failed to initialize WiFi manager");
         return;
     }
 
-    // Now check if we have stored credentials (WiFi must be initialized first)
+    // Check for stored credentials
     if (wifi_manager_get_stored_credentials(stored_ssid, stored_password) == ESP_OK) {
-        ESP_LOGI(TAG, "Found stored credentials, attempting to connect to: %s", stored_ssid);
+        ESP_LOGI(TAG, "MAIN: Found stored credentials, attempting to connect to: %s", stored_ssid);
 
         ret = wifi_manager_connect(stored_ssid, stored_password);
         if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "Connecting to stored WiFi network...");
+            ESP_LOGI(TAG, "MAIN: Connecting to stored WiFi network...");
 
             int wait_time = 0;
             while (!wifi_manager_is_connected() && wait_time < 30) {
@@ -91,60 +151,125 @@ void app_main(void)
             }
 
             if (wifi_manager_is_connected()) {
-                ESP_LOGI(TAG, "Successfully connected using stored credentials");
+                ESP_LOGI(TAG, "MAIN: ✓ Connected using stored credentials");
                 provisioning_state_set(PROV_STATE_PROVISIONED, STATUS_SUCCESS,
                                        "Connected using stored credentials");
                 connected = true;
             } else {
-                ESP_LOGW(TAG, "Failed to connect with stored credentials");
+                ESP_LOGW(TAG, "MAIN: Failed to connect with stored credentials");
             }
         }
 
         memset(stored_password, 0, sizeof(stored_password));
     } else {
-        ESP_LOGI(TAG, "No stored credentials found, starting provisioning");
+        ESP_LOGI(TAG, "MAIN: No stored credentials found, starting provisioning");
     }
 
+    // Start BLE provisioning if not connected
     if (!connected) {
         const char *service_name = idf_provisioning_get_service_name();
-        ESP_LOGI(TAG, "Starting ESP-IDF BLE provisioning (service=%s, PoP enabled)", service_name);
+        ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
 
         ret = idf_provisioning_start();
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to start provisioning: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
             return;
         }
 
         // Wait for provisioning to complete
-        // Provisioning manager will handle WiFi connection internally
         while (idf_provisioning_is_running()) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
 
-        ESP_LOGI(TAG, "Provisioning completed, WiFi connected");
+        ESP_LOGI(TAG, "MAIN: Provisioning completed, WiFi connected");
         if (idf_provisioning_is_running()) {
             idf_provisioning_stop();
         }
 
         connected = true;
     }
-
-    if (connected && !cloud_started) {
-        start_cloud_services();
-        cloud_started = true;
-    }
-
-    ESP_LOGI(TAG, "Entering normal operation mode");
     
-    // Store credentials once at startup for reconnection
+    // ========================================================================
+    // Phase 3: Launch Parallel Boot Tasks
+    // ========================================================================
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "MAIN: Launching parallel boot tasks");
+    ESP_LOGI(TAG, "========================================");
+    
+    // Launch sensor task (higher priority - user facing)
+    BaseType_t task_ret = xTaskCreate(
+        sensor_task,
+        "sensor_task",
+        SENSOR_TASK_STACK_SIZE,
+        NULL,
+        SENSOR_TASK_PRIORITY,
+        NULL
+    );
+    
+    if (task_ret != pdPASS) {
+        ESP_LOGE(TAG, "MAIN: Failed to create sensor task");
+    } else {
+        ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
+    }
+    
+    // Launch network task (lower priority - background)
+    task_ret = xTaskCreate(
+        network_task,
+        "network_task",
+        NETWORK_TASK_STACK_SIZE,
+        NULL,
+        NETWORK_TASK_PRIORITY,
+        NULL
+    );
+    
+    if (task_ret != pdPASS) {
+        ESP_LOGE(TAG, "MAIN: Failed to create network task");
+    } else {
+        ESP_LOGI(TAG, "MAIN: ✓ Network task launched (priority %d)", NETWORK_TASK_PRIORITY);
+    }
+    
+    // ========================================================================
+    // Phase 4: Wait for Boot Tasks to Complete
+    // ========================================================================
+    ESP_LOGI(TAG, "MAIN: Waiting for sensor task to complete...");
+    EventBits_t bits = xEventGroupWaitBits(
+        s_boot_event_group,
+        SENSORS_READY_BIT,
+        pdFALSE,  // Don't clear bits
+        pdFALSE,  // Wait for any bit (not all)
+        pdMS_TO_TICKS(60000)  // 60 second timeout
+    );
+    
+    if (bits & SENSORS_READY_BIT) {
+        ESP_LOGI(TAG, "MAIN: ✓ Sensors ready");
+    } else {
+        ESP_LOGW(TAG, "MAIN: Sensor task timeout (60s), continuing anyway");
+    }
+    
+    // Network task is optional - don't wait, just check status
+    bits = xEventGroupGetBits(s_boot_event_group);
+    if (bits & NETWORK_READY_BIT) {
+        ESP_LOGI(TAG, "MAIN: ✓ Network services ready");
+    } else {
+        ESP_LOGI(TAG, "MAIN: Network services still initializing (running in background)");
+    }
+    
+    // ========================================================================
+    // Phase 5: Enter Normal Operation Mode
+    // ========================================================================
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "MAIN: ✓ Boot complete, entering normal operation");
+    ESP_LOGI(TAG, "========================================");
+    
+    // Store credentials for reconnection
     static char stored_reconnect_ssid[33] = {0};
     static char stored_reconnect_password[64] = {0};
     bool has_stored_creds = (wifi_manager_get_stored_credentials(stored_reconnect_ssid, stored_reconnect_password) == ESP_OK);
     
+    // Main loop - monitor WiFi connection
     while (1) {
-        // Check connection status and reconnect if needed
         if (!wifi_manager_is_connected() && has_stored_creds) {
-            ESP_LOGW(TAG, "WiFi connection lost, attempting to reconnect to %s", stored_reconnect_ssid);
+            ESP_LOGW(TAG, "MAIN: WiFi connection lost, attempting to reconnect to %s", stored_reconnect_ssid);
             wifi_manager_connect(stored_reconnect_ssid, stored_reconnect_password);
         }
 
@@ -152,9 +277,223 @@ void app_main(void)
     }
 }
 
+// ============================================================================
+// Sensor Task - Parallel Sensor Initialization
+// ============================================================================
+
 /**
- * @brief Start cloud services (consolidated from duplicate code paths)
- * This includes: time sync, cloud provisioning, HTTPS server, I2C/sensors, and MQTT
+ * @brief Sensor initialization task with retry logic
+ * Runs in parallel with network task, higher priority for user-facing operation
+ */
+static void sensor_task(void *arg)
+{
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "SENSOR TASK: Starting");
+    ESP_LOGI(TAG, "========================================");
+    
+    esp_err_t ret;
+    
+    // Phase 1: I2C Stabilization (3 seconds)
+    ESP_LOGI(TAG, "SENSOR: Waiting %dms for I2C sensor stabilization...", I2C_STABILIZATION_DELAY_MS);
+    vTaskDelay(pdMS_TO_TICKS(I2C_STABILIZATION_DELAY_MS));
+    
+    // Phase 2: Initial I2C Scan
+    ESP_LOGI(TAG, "SENSOR: Performing initial I2C scan...");
+    ret = i2c_scanner_scan();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "SENSOR: I2C scan encountered errors: %s", esp_err_to_name(ret));
+    }
+    
+    // Phase 3: Sensor Initialization with Retry Logic
+    ESP_LOGI(TAG, "SENSOR: Initializing sensor manager...");
+    
+    // The sensor_manager_init() already has retry logic built in
+    // We'll call it multiple times if it fails completely
+    int init_attempts = 0;
+    while (init_attempts < SENSOR_INIT_RETRY_COUNT) {
+        ret = sensor_manager_init();
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "SENSOR: ✓ Sensor manager initialized successfully");
+            break;
+        }
+        
+        init_attempts++;
+        if (init_attempts < SENSOR_INIT_RETRY_COUNT) {
+            ESP_LOGW(TAG, "SENSOR: Init attempt %d/%d failed, retrying in %dms...", 
+                     init_attempts, SENSOR_INIT_RETRY_COUNT, SENSOR_INIT_RETRY_DELAY_MS);
+            vTaskDelay(pdMS_TO_TICKS(SENSOR_INIT_RETRY_DELAY_MS));
+        } else {
+            ESP_LOGW(TAG, "SENSOR: Failed to initialize sensor manager after %d attempts", 
+                     SENSOR_INIT_RETRY_COUNT);
+            ESP_LOGW(TAG, "SENSOR: Continuing with no sensors (graceful degradation)");
+        }
+    }
+    
+    // Phase 4: Final Verification Scan
+    ESP_LOGI(TAG, "SENSOR: Performing final I2C verification scan...");
+    i2c_scanner_scan();
+    
+    // Log comprehensive sensor inventory
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "SENSOR INVENTORY:");
+    ESP_LOGI(TAG, "  Battery Monitor: %s", sensor_manager_has_battery_monitor() ? "YES" : "NO");
+    ESP_LOGI(TAG, "  EZO Sensors: %d", sensor_manager_get_ezo_count());
+    ESP_LOGI(TAG, "========================================");
+    
+    // Phase 5: Start Sensor Reading Task
+    ESP_LOGI(TAG, "SENSOR: Starting sensor reading task...");
+    ret = sensor_manager_start_reading_task(10);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "SENSOR: Failed to start reading task: %s", esp_err_to_name(ret));
+    }
+    
+    // Phase 6: Signal Sensor Task Ready
+    ESP_LOGI(TAG, "SENSOR: ✓ Sensor task complete, signaling SENSORS_READY");
+    xEventGroupSetBits(s_boot_event_group, SENSORS_READY_BIT);
+    
+    // Task complete - delete itself
+    vTaskDelete(NULL);
+}
+
+// ============================================================================
+// Network Task - Parallel Network Initialization
+// ============================================================================
+
+/**
+ * @brief Network initialization task with proper TLS ordering
+ * Runs in parallel with sensor task, lower priority for background operation
+ */
+static void network_task(void *arg)
+{
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "NETWORK TASK: Starting");
+    ESP_LOGI(TAG, "========================================");
+    
+    esp_err_t ret;
+    
+    // WiFi should already be initialized and connected by this point from app_main
+    // But we'll verify and wait if needed
+    if (!wifi_manager_is_connected()) {
+        ESP_LOGW(TAG, "NETWORK: WiFi not connected, waiting...");
+        int wait_time = 0;
+        while (!wifi_manager_is_connected() && wait_time < (WIFI_CONNECT_TIMEOUT_MS / 1000)) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wait_time++;
+        }
+        
+        if (!wifi_manager_is_connected()) {
+            ESP_LOGW(TAG, "NETWORK: WiFi connection timeout, network services unavailable");
+            // Don't signal NETWORK_READY - continue with sensors only
+            vTaskDelete(NULL);
+            return;
+        }
+    }
+    
+    ESP_LOGI(TAG, "NETWORK: ✓ WiFi connected");
+    
+    // Phase 1: Time Synchronization (required for TLS certificate validation)
+    ESP_LOGI(TAG, "NETWORK: Initializing NTP time synchronization...");
+    ret = time_sync_init(NULL, time_sync_handler);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "NETWORK: Failed to initialize time sync: %s", esp_err_to_name(ret));
+    }
+    
+    ESP_LOGI(TAG, "NETWORK: Waiting for time synchronization...");
+    int sync_wait = 0;
+    while (!time_sync_is_synced() && sync_wait < 10) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        sync_wait++;
+    }
+    
+    if (!time_sync_is_synced()) {
+        ESP_LOGW(TAG, "NETWORK: Time sync timeout, TLS may fail");
+    }
+    
+    // Phase 2: Cloud Provisioning (CRITICAL - must complete before TLS services)
+    ESP_LOGI(TAG, "NETWORK: Initializing API key manager...");
+    api_key_manager_init();
+    
+    ESP_LOGI(TAG, "NETWORK: Initializing cloud provisioning...");
+    cloud_prov_init(cloud_prov_handler);
+    
+    ESP_LOGI(TAG, "NETWORK: Starting cloud provisioning (fetching certificates)...");
+    ret = cloud_prov_provision_device();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "NETWORK: Cloud provisioning failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "NETWORK: Retrying cloud provisioning in %dms...", CLOUD_PROVISION_RETRY_MS);
+        
+        // Retry cloud provisioning with longer timeout
+        vTaskDelay(pdMS_TO_TICKS(CLOUD_PROVISION_RETRY_MS));
+        ret = cloud_prov_provision_device();
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "NETWORK: Cloud provisioning failed after retry, network services unavailable");
+            vTaskDelete(NULL);
+            return;
+        }
+    }
+    
+    ESP_LOGI(TAG, "NETWORK: ✓ Cloud provisioning complete (certificates obtained)");
+    
+    // Download MQTT CA certificate
+    ESP_LOGI(TAG, "NETWORK: Downloading MQTT CA certificate...");
+    ret = cloud_prov_download_mqtt_ca_cert();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "NETWORK: Failed to download MQTT CA cert: %s", esp_err_to_name(ret));
+    }
+    
+    // Phase 3: Start MQTT Client (requires certificates)
+    ESP_LOGI(TAG, "NETWORK: Initializing MQTT client...");
+    const char *mqtt_broker = "mqtts://mqtt.kannacloud.com:8883";
+    const char *mqtt_username = "sensor01";
+    const char *mqtt_password = "xkKKYQWxiT83Ni3";
+    
+    ret = mqtt_client_init(mqtt_broker, mqtt_username, mqtt_password);
+    if (ret == ESP_OK) {
+        ret = mqtt_client_start();
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "NETWORK: ✓ MQTT client started");
+        } else {
+            ESP_LOGW(TAG, "NETWORK: Failed to start MQTT: %s", esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGW(TAG, "NETWORK: Failed to init MQTT: %s", esp_err_to_name(ret));
+    }
+    
+#ifndef CONFIG_IDF_TARGET_ESP32C6
+    // Phase 4: Start HTTPS Server (S3 only, requires certificates)
+    ESP_LOGI(TAG, "NETWORK: Initializing mDNS service...");
+    ret = mdns_service_init("kc", "KannaCloud Device");
+    if (ret == ESP_OK) {
+        mdns_service_add_https(443);
+    } else {
+        ESP_LOGW(TAG, "NETWORK: mDNS init failed: %s", esp_err_to_name(ret));
+    }
+    
+    ESP_LOGI(TAG, "NETWORK: Starting HTTPS dashboard server...");
+    ret = http_server_start();
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "NETWORK: ✓ HTTPS server started");
+        ESP_LOGI(TAG, "NETWORK: ✓ Access dashboard at: https://kc.local");
+    } else {
+        ESP_LOGE(TAG, "NETWORK: Failed to start HTTPS server: %s", esp_err_to_name(ret));
+    }
+#else
+    ESP_LOGI(TAG, "NETWORK: Running in cloud-only mode (ESP32-C6)");
+#endif
+    
+    // Phase 5: Signal Network Task Ready
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "NETWORK: ✓ All network services started");
+    ESP_LOGI(TAG, "========================================");
+    xEventGroupSetBits(s_boot_event_group, NETWORK_READY_BIT);
+    
+    // Task complete - delete itself
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief Start cloud services (LEGACY - kept for compatibility)
+ * This function is now replaced by network_task, but kept to avoid breaking existing code paths
  */
 static void start_cloud_services(void)
 {

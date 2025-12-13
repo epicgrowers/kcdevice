@@ -27,4 +27,4 @@ idf_component_register(SRCS "main.c"
                              "web_file_editor.c"
                        INCLUDE_DIRS "."
                        EMBED_TXTFILES ${WEB_FILES}
-                       REQUIRES nvs_flash bt esp_wifi wifi_provisioning json esp_partition bootloader_support efuse driver esp_http_client app_update mqtt spi_flash ${WEB_COMPONENTS})
+                       REQUIRES nvs_flash bt esp_wifi wifi_provisioning json esp_partition bootloader_support efuse driver esp_http_client app_update mqtt spi_flash esp_psram ${WEB_COMPONENTS})
