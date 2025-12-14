@@ -1553,6 +1553,234 @@ static esp_err_t api_sensors_config_handler(httpd_req_t *req)
     return send_sensor_success_response(req, sensor);
 }
 
+/**
+ * @brief POST /api/sensors/config/batch - Update multiple sensor configurations
+ * Body: {"sensors": [{"address": 99, "led": true, "name": "pH1"}, {"address": 100, "led": false}]}
+ */
+static esp_err_t api_sensors_config_batch_handler(httpd_req_t *req)
+{
+    char content[2048];
+    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
+    if (ret <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request");
+        return ESP_FAIL;
+    }
+    content[ret] = '\0';
+    
+    cJSON *root = cJSON_Parse(content);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+    
+    cJSON *sensors_array = cJSON_GetObjectItem(root, "sensors");
+    if (sensors_array == NULL || !cJSON_IsArray(sensors_array)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sensors array");
+        return ESP_FAIL;
+    }
+    
+    int array_size = cJSON_GetArraySize(sensors_array);
+    if (array_size == 0) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty sensors array");
+        return ESP_FAIL;
+    }
+    
+    if (array_size > 10) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Max 10 sensors per batch");
+        return ESP_FAIL;
+    }
+    
+    // Pause sensor readings during batch update
+    sensor_manager_pause_reading();
+    
+    // Wait 500ms to ensure sensor task has fully stopped
+    vTaskDelay(pdMS_TO_TICKS(500));
+    
+    // Build response
+    cJSON *response_root = cJSON_CreateObject();
+    cJSON *results = cJSON_CreateArray();
+    int updated_count = 0;
+    int failed_count = 0;
+    
+    // Process each sensor configuration
+    for (int i = 0; i < array_size; i++) {
+        cJSON *sensor_config = cJSON_GetArrayItem(sensors_array, i);
+        if (!cJSON_IsObject(sensor_config)) {
+            failed_count++;
+            cJSON *error_result = cJSON_CreateObject();
+            cJSON_AddNumberToObject(error_result, "index", i);
+            cJSON_AddStringToObject(error_result, "status", "error");
+            cJSON_AddStringToObject(error_result, "error", "Invalid sensor config object");
+            cJSON_AddItemToArray(results, error_result);
+            continue;
+        }
+        
+        cJSON *address_json = cJSON_GetObjectItem(sensor_config, "address");
+        if (address_json == NULL || !cJSON_IsNumber(address_json)) {
+            failed_count++;
+            cJSON *error_result = cJSON_CreateObject();
+            cJSON_AddNumberToObject(error_result, "index", i);
+            cJSON_AddStringToObject(error_result, "status", "error");
+            cJSON_AddStringToObject(error_result, "error", "Missing address");
+            cJSON_AddItemToArray(results, error_result);
+            continue;
+        }
+        
+        uint8_t address = (uint8_t)address_json->valueint;
+        
+        // Find sensor by address
+        ezo_sensor_t *sensor = NULL;
+        uint8_t ezo_count = sensor_manager_get_ezo_count();
+        for (uint8_t j = 0; j < ezo_count; j++) {
+            ezo_sensor_t *s = (ezo_sensor_t*)sensor_manager_get_ezo_sensor(j);
+            if (s != NULL && s->config.i2c_address == address) {
+                sensor = s;
+                break;
+            }
+        }
+        
+        if (sensor == NULL) {
+            failed_count++;
+            cJSON *error_result = cJSON_CreateObject();
+            cJSON_AddNumberToObject(error_result, "address", address);
+            cJSON_AddStringToObject(error_result, "status", "error");
+            cJSON_AddStringToObject(error_result, "error", "Sensor not found");
+            cJSON_AddItemToArray(results, error_result);
+            continue;
+        }
+        
+        bool has_error = false;
+        char error_msg[128] = {0};
+        
+        // Update LED
+        cJSON *led = cJSON_GetObjectItem(sensor_config, "led");
+        if (led != NULL && cJSON_IsBool(led)) {
+            ezo_sensor_set_led(sensor, cJSON_IsTrue(led));
+        }
+        
+        // Update name with validation
+        cJSON *name = cJSON_GetObjectItem(sensor_config, "name");
+        if (name != NULL && cJSON_IsString(name)) {
+            const char *name_str = name->valuestring;
+            size_t name_len = strlen(name_str);
+            
+            if (name_len == 0 || name_len > 16) {
+                has_error = true;
+                snprintf(error_msg, sizeof(error_msg), "Name must be 1-16 characters");
+            } else {
+                // Check for valid characters
+                bool valid = true;
+                for (size_t k = 0; k < name_len; k++) {
+                    char c = name_str[k];
+                    if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || 
+                          (c >= '0' && c <= '9') || c == '_')) {
+                        valid = false;
+                        break;
+                    }
+                }
+                
+                if (!valid) {
+                    has_error = true;
+                    snprintf(error_msg, sizeof(error_msg), "Name must contain only letters, numbers, and underscores");
+                } else {
+                    esp_err_t name_ret = ezo_sensor_set_name(sensor, name_str);
+                    if (name_ret != ESP_OK) {
+                        ESP_LOGW(TAG, "Failed to set sensor name for address %d: %s", address, esp_err_to_name(name_ret));
+                    }
+                }
+            }
+        }
+        
+        // Update protocol lock
+        cJSON *plock = cJSON_GetObjectItem(sensor_config, "plock");
+        if (plock != NULL && cJSON_IsBool(plock)) {
+            ezo_sensor_set_plock(sensor, cJSON_IsTrue(plock));
+        }
+        
+        // Type-specific updates
+        if (strcmp(sensor->config.type, "RTD") == 0) {
+            cJSON *scale = cJSON_GetObjectItem(sensor_config, "scale");
+            if (scale != NULL && cJSON_IsString(scale) && strlen(scale->valuestring) > 0) {
+                ezo_rtd_set_scale(sensor, scale->valuestring[0]);
+            }
+        } else if (strcmp(sensor->config.type, "pH") == 0) {
+            cJSON *ext_scale = cJSON_GetObjectItem(sensor_config, "extended_scale");
+            if (ext_scale != NULL && cJSON_IsBool(ext_scale)) {
+                ezo_ph_set_extended_scale(sensor, cJSON_IsTrue(ext_scale));
+            }
+        } else if (strcmp(sensor->config.type, "EC") == 0) {
+            cJSON *probe = cJSON_GetObjectItem(sensor_config, "probe_type");
+            if (probe != NULL && cJSON_IsNumber(probe)) {
+                ezo_ec_set_probe_type(sensor, (float)probe->valuedouble);
+            }
+            
+            cJSON *tds = cJSON_GetObjectItem(sensor_config, "tds_factor");
+            if (tds != NULL && cJSON_IsNumber(tds)) {
+                ezo_ec_set_tds_factor(sensor, (float)tds->valuedouble);
+            }
+        }
+        
+        // Note: Skip refresh_settings here to avoid pausing sensors repeatedly
+        // Settings are already applied via the set functions above
+        // The normal sensor reading cycle will query updated values
+        
+        // Add result
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddNumberToObject(result, "address", address);
+        
+        if (has_error) {
+            failed_count++;
+            cJSON_AddStringToObject(result, "status", "error");
+            cJSON_AddStringToObject(result, "error", error_msg);
+        } else {
+            updated_count++;
+            cJSON_AddStringToObject(result, "status", "success");
+            cJSON *sensor_json = build_sensor_json(sensor, -1, false);
+            if (sensor_json != NULL) {
+                cJSON_AddItemToObject(result, "sensor", sensor_json);
+            }
+        }
+        
+        cJSON_AddItemToArray(results, result);
+    }
+    
+    // Build final response
+    if (failed_count == 0) {
+        cJSON_AddStringToObject(response_root, "status", "success");
+    } else if (updated_count == 0) {
+        cJSON_AddStringToObject(response_root, "status", "failed");
+    } else {
+        cJSON_AddStringToObject(response_root, "status", "partial");
+    }
+    
+    cJSON_AddNumberToObject(response_root, "updated", updated_count);
+    cJSON_AddNumberToObject(response_root, "failed", failed_count);
+    cJSON_AddItemToObject(response_root, "results", results);
+    
+    const char *response_str = cJSON_PrintUnformatted(response_root);
+    if (response_str == NULL) {
+        cJSON_Delete(response_root);
+        cJSON_Delete(root);
+        sensor_manager_resume_reading();  // Resume before error
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to serialize JSON");
+        return ESP_FAIL;
+    }
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, response_str);
+    free((void*)response_str);
+    cJSON_Delete(response_root);
+    cJSON_Delete(root);
+    
+    // Resume sensor readings after batch update
+    sensor_manager_resume_reading();
+    
+    return ESP_OK;
+}
+
 static esp_err_t api_sensor_calibrate_handler(httpd_req_t *req)
 {
     uint8_t address;
@@ -2086,6 +2314,13 @@ static const httpd_uri_t api_sensors_config_uri = {
     .user_ctx = NULL
 };
 
+static const httpd_uri_t api_sensors_config_batch_uri = {
+    .uri = "/api/sensors/config/batch",
+    .method = HTTP_POST,
+    .handler = api_sensors_config_batch_handler,
+    .user_ctx = NULL
+};
+
 static const httpd_uri_t api_sensors_pause_uri = {
     .uri = "/api/sensors/pause",
     .method = HTTP_POST,
@@ -2553,6 +2788,7 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_sensors_list_uri);
     httpd_register_uri_handler(s_server, &api_sensors_rescan_uri);
     httpd_register_uri_handler(s_server, &api_sensors_config_uri);
+    httpd_register_uri_handler(s_server, &api_sensors_config_batch_uri);
     httpd_register_uri_handler(s_server, &api_sensors_pause_uri);
     httpd_register_uri_handler(s_server, &api_sensors_resume_uri);
     httpd_register_uri_handler(s_server, &api_sensor_calibrate_uri);

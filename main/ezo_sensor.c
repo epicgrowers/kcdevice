@@ -574,12 +574,17 @@ esp_err_t ezo_sensor_set_name(ezo_sensor_t *sensor, const char *name) {
         }
     }
 
-    // Pause sensor reading to avoid I2C conflicts
+    // Pause sensor reading to avoid I2C conflicts (if not already paused)
     extern esp_err_t sensor_manager_pause_reading(void);
     extern bool sensor_manager_is_reading_in_progress(void);
     extern esp_err_t sensor_manager_resume_reading(void);
+    extern bool sensor_manager_is_reading_paused(void);
     
-    sensor_manager_pause_reading();
+    bool was_already_paused = sensor_manager_is_reading_paused();
+    
+    if (!was_already_paused) {
+        sensor_manager_pause_reading();
+    }
     
     // Wait for any in-progress reading to complete (max 3 seconds)
     int wait_count = 0;
@@ -648,8 +653,10 @@ esp_err_t ezo_sensor_set_name(ezo_sensor_t *sensor, const char *name) {
         ESP_LOGE(TAG, "Failed to set sensor name: %s", esp_err_to_name(ret));
     }
     
-    // Resume sensor reading
-    sensor_manager_resume_reading();
+    // Resume sensor reading only if we paused it
+    if (!was_already_paused) {
+        sensor_manager_resume_reading();
+    }
     
     return ret;
 }

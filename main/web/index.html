@@ -99,9 +99,14 @@
 
 <div class='tab-content' id='tab-1' style='display:none'>
 <h2 class='text-xl font-bold text-gray-900 dark:text-white mb-4'>🔬 Sensor Configuration</h2>
-<button onclick='rescanSensors()' class='bg-green-600 dark:bg-green-400 hover:bg-green-700 dark:hover:bg-green-500 text-white px-4 py-2 rounded-md mb-4'>
+<div class='flex gap-3 mb-4'>
+<button onclick='rescanSensors()' class='bg-green-600 dark:bg-green-400 hover:bg-green-700 dark:hover:bg-green-500 text-white px-4 py-2 rounded-md'>
 <i class='fas fa-sync-alt'></i> Rescan I2C Bus
 </button>
+<button onclick='saveAllSensors()' class='bg-blue-600 dark:bg-blue-400 hover:bg-blue-700 dark:hover:bg-blue-500 text-white px-4 py-2 rounded-md font-semibold'>
+<i class='fas fa-save'></i> Save All Sensors
+</button>
+</div>
 <div id='sensor-list' class='text-gray-600 dark:text-gray-400'>Loading sensors...</div>
 </div>
 
