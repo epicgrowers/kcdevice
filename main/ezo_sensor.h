@@ -485,6 +485,127 @@ esp_err_t ezo_do_set_output_parameter(ezo_sensor_t *sensor, const char *param, b
  */
 esp_err_t ezo_sensor_get_output_config(ezo_sensor_t *sensor, char *config, size_t config_size);
 
+// Advanced features
+/**
+ * @brief Export calibration data as a string
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param export_data Buffer to store exported calibration string
+ * @param data_size Size of export buffer
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_export_calibration(ezo_sensor_t *sensor, char *export_data, size_t data_size);
+
+/**
+ * @brief Import calibration data from a string
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param import_data Calibration data string to import
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_import_calibration(ezo_sensor_t *sensor, const char *import_data);
+
+/**
+ * @brief Query pH sensor slope values (acid/base slopes)
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param slope_data Buffer to store slope information
+ * @param data_size Size of buffer
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ph_get_slope(ezo_sensor_t *sensor, char *slope_data, size_t data_size);
+
+/**
+ * @brief Make the sensor LED blink rapidly for identification
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_find(ezo_sensor_t *sensor);
+
+/**
+ * @brief Get comprehensive device status (restart reason, Vcc, etc.)
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param status_data Buffer to store status information
+ * @param data_size Size of buffer
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_get_status(ezo_sensor_t *sensor, char *status_data, size_t data_size);
+
+/**
+ * @brief Get baud rate configuration
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param baud_rate Pointer to store baud rate value
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_get_baud(ezo_sensor_t *sensor, uint32_t *baud_rate);
+
+/**
+ * @brief Set baud rate (300-115200)
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param baud_rate Baud rate value
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_set_baud(ezo_sensor_t *sensor, uint32_t baud_rate);
+
+// EC-specific advanced functions
+/**
+ * @brief Get EC sensor temperature compensation value
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param temperature_c Pointer to store temperature in Celsius
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_get_temperature_comp(ezo_sensor_t *sensor, float *temperature_c);
+
+/**
+ * @brief Set EC sensor temperature compensation
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param temperature_c Temperature in Celsius
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_set_temperature_comp(ezo_sensor_t *sensor, float temperature_c);
+
+/**
+ * @brief Get data logger interval for EC sensor
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param interval_ms Pointer to store interval in milliseconds
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_get_data_logger_interval(ezo_sensor_t *sensor, uint32_t *interval_ms);
+
+/**
+ * @brief Set data logger interval for EC sensor
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param interval_ms Interval in milliseconds (0 to disable)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_set_data_logger_interval(ezo_sensor_t *sensor, uint32_t interval_ms);
+
+/**
+ * @brief Lock/unlock K value to prevent accidental changes
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param locked true to lock, false to unlock
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_set_k_lock(ezo_sensor_t *sensor, bool locked);
+
+/**
+ * @brief Lock/unlock TDS conversion factor
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param locked true to lock, false to unlock
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_ec_set_tds_lock(ezo_sensor_t *sensor, bool locked);
+
 #ifdef __cplusplus
 }
 #endif

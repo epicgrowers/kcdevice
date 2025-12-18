@@ -2214,6 +2214,344 @@ static esp_err_t api_sensor_sample_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// New advanced feature handlers
+static esp_err_t api_sensor_export_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/export/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    char export_data[128] = {0};
+    esp_err_t ret = ezo_sensor_export_calibration(sensor, export_data, sizeof(export_data));
+    
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Export failed");
+        return ESP_FAIL;
+    }
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "calibration_data", export_data);
+    cJSON_AddNumberToObject(response, "address", address);
+
+    const char *payload = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, payload);
+    free((void*)payload);
+    sensor_read_guard_release(&guard);
+    return ESP_OK;
+}
+
+static esp_err_t api_sensor_import_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/import/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    cJSON *cal_data = cJSON_GetObjectItem(payload, "calibration_data");
+    if (cal_data == NULL || !cJSON_IsString(cal_data)) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing calibration_data");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ezo_sensor_import_calibration(sensor, cal_data->valuestring);
+    cJSON_Delete(payload);
+    free(raw);
+
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Import failed");
+        return ESP_FAIL;
+    }
+
+    esp_err_t resp = send_sensor_success_response(req, sensor);
+    sensor_read_guard_release(&guard);
+    return resp;
+}
+
+static esp_err_t api_sensor_find_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/find/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ezo_sensor_find(sensor);
+    
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Find command failed");
+        return ESP_FAIL;
+    }
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "blinking");
+    cJSON_AddNumberToObject(response, "address", address);
+
+    const char *payload_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, payload_str);
+    free((void*)payload_str);
+    sensor_read_guard_release(&guard);
+    return ESP_OK;
+}
+
+static esp_err_t api_sensor_device_status_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/device-status/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    char status_data[128] = {0};
+    esp_err_t ret = ezo_sensor_get_status(sensor, status_data, sizeof(status_data));
+    
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Status query failed");
+        return ESP_FAIL;
+    }
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "device_status", status_data);
+    cJSON_AddNumberToObject(response, "address", address);
+
+    const char *payload = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, payload);
+    free((void*)payload);
+    sensor_read_guard_release(&guard);
+    return ESP_OK;
+}
+
+static esp_err_t api_sensor_slope_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/slope/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    if (strcmp(sensor->config.type, EZO_TYPE_PH) != 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Slope only available for pH sensors");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    char slope_data[64] = {0};
+    esp_err_t ret = ezo_ph_get_slope(sensor, slope_data, sizeof(slope_data));
+    
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Slope query failed");
+        return ESP_FAIL;
+    }
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "slope", slope_data);
+    cJSON_AddNumberToObject(response, "address", address);
+
+    const char *payload = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, payload);
+    free((void*)payload);
+    sensor_read_guard_release(&guard);
+    return ESP_OK;
+}
+
+static esp_err_t api_sensor_ec_temp_comp_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/ec-temp-comp/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Temperature compensation only available for EC sensors");
+        return ESP_FAIL;
+    }
+
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    cJSON *temp = cJSON_GetObjectItem(payload, "temp_c");
+    if (temp == NULL || !cJSON_IsNumber(temp)) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing temp_c value");
+        return ESP_FAIL;
+    }
+    float target = (float)temp->valuedouble;
+    cJSON_Delete(payload);
+    free(raw);
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ezo_ec_set_temperature_comp(sensor, target);
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set temperature compensation");
+        return ESP_FAIL;
+    }
+
+    esp_err_t resp = send_sensor_success_response(req, sensor);
+    sensor_read_guard_release(&guard);
+    return resp;
+}
+
+static esp_err_t api_sensor_ec_output_params_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/ec-output-params/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Output parameters only available for EC sensors");
+        return ESP_FAIL;
+    }
+
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ESP_OK;
+    
+    cJSON *ec = cJSON_GetObjectItem(payload, "ec");
+    if (ec != NULL && cJSON_IsBool(ec)) {
+        ret = ezo_ec_set_output_parameter(sensor, "EC", cJSON_IsTrue(ec));
+    }
+    
+    if (ret == ESP_OK) {
+        cJSON *tds = cJSON_GetObjectItem(payload, "tds");
+        if (tds != NULL && cJSON_IsBool(tds)) {
+            ret = ezo_ec_set_output_parameter(sensor, "TDS", cJSON_IsTrue(tds));
+        }
+    }
+    
+    if (ret == ESP_OK) {
+        cJSON *s = cJSON_GetObjectItem(payload, "s");
+        if (s != NULL && cJSON_IsBool(s)) {
+            ret = ezo_ec_set_output_parameter(sensor, "S", cJSON_IsTrue(s));
+        }
+    }
+    
+    if (ret == ESP_OK) {
+        cJSON *sg = cJSON_GetObjectItem(payload, "sg");
+        if (sg != NULL && cJSON_IsBool(sg)) {
+            ret = ezo_ec_set_output_parameter(sensor, "SG", cJSON_IsTrue(sg));
+        }
+    }
+
+    cJSON_Delete(payload);
+    free(raw);
+
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set output parameters");
+        return ESP_FAIL;
+    }
+
+    esp_err_t resp = send_sensor_success_response(req, sensor);
+    sensor_read_guard_release(&guard);
+    return resp;
+}
+
 // URI handlers
 static const httpd_uri_t favicon_uri = {
     .uri = "/favicon.ico",
@@ -2374,6 +2712,55 @@ static const httpd_uri_t api_sensor_sample_uri = {
     .uri = "/api/sensors/sample/*",
     .method = HTTP_GET,
     .handler = api_sensor_sample_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_export_uri = {
+    .uri = "/api/sensors/export/*",
+    .method = HTTP_GET,
+    .handler = api_sensor_export_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_import_uri = {
+    .uri = "/api/sensors/import/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_import_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_find_uri = {
+    .uri = "/api/sensors/find/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_find_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_device_status_uri = {
+    .uri = "/api/sensors/device-status/*",
+    .method = HTTP_GET,
+    .handler = api_sensor_device_status_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_slope_uri = {
+    .uri = "/api/sensors/slope/*",
+    .method = HTTP_GET,
+    .handler = api_sensor_slope_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_ec_temp_comp_uri = {
+    .uri = "/api/sensors/ec-temp-comp/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_ec_temp_comp_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_ec_output_params_uri = {
+    .uri = "/api/sensors/ec-output-params/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_ec_output_params_handler,
     .user_ctx = NULL
 };
 
@@ -2738,7 +3125,7 @@ esp_err_t http_server_start(void)
     
     // Configure HTTPS server
     httpd_ssl_config_t config = HTTPD_SSL_CONFIG_DEFAULT();
-    config.httpd.max_uri_handlers = 30;  // Increased for web file editor + sensor action endpoints
+    config.httpd.max_uri_handlers = 40;  // Increased for web file editor + sensor action endpoints + new diagnostic endpoints
     config.httpd.stack_size = 8192;  // Reduced stack to save memory
     config.httpd.max_open_sockets = 3;  // Allow multiple connections now that PSRAM is enabled
     config.httpd.lru_purge_enable = true;  // Enable automatic cleanup of old connections
@@ -2797,6 +3184,14 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_sensor_power_uri);
     httpd_register_uri_handler(s_server, &api_sensor_status_uri);
     httpd_register_uri_handler(s_server, &api_sensor_sample_uri);
+    // New advanced sensor feature endpoints
+    httpd_register_uri_handler(s_server, &api_sensor_export_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_import_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_find_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_device_status_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_slope_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_ec_temp_comp_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_ec_output_params_uri);
     // Register specific list endpoint before wildcard catch-alls so /list is handled correctly
     httpd_register_uri_handler(s_server, &api_webfiles_list_uri);
     httpd_register_uri_handler(s_server, &api_webfiles_reset_uri);

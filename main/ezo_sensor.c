@@ -1229,3 +1229,205 @@ esp_err_t ezo_sensor_get_output_config(ezo_sensor_t *sensor, char *config, size_
     
     return ezo_sensor_send_command(sensor, "O,?", config, config_size, EZO_SHORT_WAIT_MS);
 }
+
+// Advanced features implementation
+esp_err_t ezo_sensor_export_calibration(ezo_sensor_t *sensor, char *export_data, size_t data_size) {
+    if (sensor == NULL || export_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    return ezo_sensor_send_command(sensor, "Export", export_data, data_size, EZO_LONG_WAIT_MS);
+}
+
+esp_err_t ezo_sensor_import_calibration(ezo_sensor_t *sensor, const char *import_data) {
+    if (sensor == NULL || import_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    char command[128];
+    snprintf(command, sizeof(command), "Import,%s", import_data);
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_LONG_WAIT_MS);
+}
+
+esp_err_t ezo_ph_get_slope(ezo_sensor_t *sensor, char *slope_data, size_t data_size) {
+    if (sensor == NULL || slope_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_PH) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    return ezo_sensor_send_command(sensor, "Slope,?", slope_data, data_size, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_sensor_find(ezo_sensor_t *sensor) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    return ezo_sensor_send_command(sensor, "Find", NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_sensor_get_status(ezo_sensor_t *sensor, char *status_data, size_t data_size) {
+    if (sensor == NULL || status_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    return ezo_sensor_send_command(sensor, "Status", status_data, data_size, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_sensor_get_baud(ezo_sensor_t *sensor, uint32_t *baud_rate) {
+    if (sensor == NULL || baud_rate == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    char response[EZO_LARGEST_STRING] = {0};
+    esp_err_t ret = ezo_sensor_send_command(sensor, "Baud,?", response, sizeof(response), EZO_SHORT_WAIT_MS);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    // Parse response: ?Baud,<value>
+    char *token = strtok(response, ",");
+    if (token != NULL && strcmp(token, "?Baud") == 0) {
+        token = strtok(NULL, ",");
+        if (token != NULL) {
+            *baud_rate = (uint32_t)atoi(token);
+            return ESP_OK;
+        }
+    }
+    
+    return ESP_FAIL;
+}
+
+esp_err_t ezo_sensor_set_baud(ezo_sensor_t *sensor, uint32_t baud_rate) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Validate baud rate
+    if (baud_rate < 300 || baud_rate > 115200) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    char command[32];
+    snprintf(command, sizeof(command), "Baud,%lu", (unsigned long)baud_rate);
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+// EC-specific advanced functions
+esp_err_t ezo_ec_get_temperature_comp(ezo_sensor_t *sensor, float *temperature_c) {
+    if (sensor == NULL || temperature_c == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    char response[EZO_LARGEST_STRING] = {0};
+    esp_err_t ret = ezo_sensor_send_command(sensor, "T,?", response, sizeof(response), EZO_SHORT_WAIT_MS);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    char *token = strtok(response, ",");
+    if (token != NULL && strcmp(token, "?T") == 0) {
+        token = strtok(NULL, ",");
+        if (token != NULL) {
+            *temperature_c = atof(token);
+            return ESP_OK;
+        }
+    }
+    
+    return ESP_FAIL;
+}
+
+esp_err_t ezo_ec_set_temperature_comp(ezo_sensor_t *sensor, float temperature_c) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    char command[32];
+    snprintf(command, sizeof(command), "T,%.2f", temperature_c);
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_ec_get_data_logger_interval(ezo_sensor_t *sensor, uint32_t *interval_ms) {
+    if (sensor == NULL || interval_ms == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    char response[EZO_LARGEST_STRING] = {0};
+    esp_err_t ret = ezo_sensor_send_command(sensor, "D,?", response, sizeof(response), EZO_SHORT_WAIT_MS);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    // Parse response: ?D,<value>
+    char *token = strtok(response, ",");
+    if (token != NULL && strcmp(token, "?D") == 0) {
+        token = strtok(NULL, ",");
+        if (token != NULL) {
+            *interval_ms = (uint32_t)atoi(token);
+            return ESP_OK;
+        }
+    }
+    
+    return ESP_FAIL;
+}
+
+esp_err_t ezo_ec_set_data_logger_interval(ezo_sensor_t *sensor, uint32_t interval_ms) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    char command[32];
+    snprintf(command, sizeof(command), "D,%lu", (unsigned long)interval_ms);
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_ec_set_k_lock(ezo_sensor_t *sensor, bool locked) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    const char *command = locked ? "K,lock" : "K,unlock";
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_ec_set_tds_lock(ezo_sensor_t *sensor, bool locked) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_EC) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    const char *command = locked ? "TDS,lock" : "TDS,unlock";
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}

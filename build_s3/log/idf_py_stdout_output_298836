@@ -1,0 +1,933 @@
+Command: C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:\Espressif\frameworks\esp-idf-v5.5.1-2\tools/idf_monitor.py -p COM3 -b 115200 --toolchain-prefix xtensa-esp32s3-elf- --target esp32s3 --revision 0 C:\Code\kc_device\build_s3\kc_device.elf C:\Code\kc_device\build_s3\bootloader\bootloader.elf --force-color -m 'C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe' 'C:\Espressif\frameworks\esp-idf-v5.5.1-2\tools\idf.py' '-B' 'build_s3' '-D' 'SDKCONFIG=sdkconfig.s3' '-p' 'COM3'
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037ed32
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x158c
+load:0x403c8700,len:0xd24
+load:0x403cb700,len:0x2f34
+entry 0x403c8924
+[0;32mI (24) boot: ESP-IDF v5.5.1 2nd stage bootloader[0m
+[0;32mI (24) boot: compile time Dec  5 2025 13:05:55[0m
+[0;32mI (25) boot: Multicore bootloader[0m
+[0;32mI (25) boot: chip revision: v0.2[0m
+[0;32mI (27) boot: efuse block revision: v1.3[0m
+[0;32mI (31) boot.esp32s3: Boot SPI Speed : 80MHz[0m
+[0;32mI (35) boot.esp32s3: SPI Mode       : DIO[0m
+[0;32mI (39) boot.esp32s3: SPI Flash Size : 4MB[0m
+[0;32mI (42) boot: Enabling RNG early entropy source...[0m
+[0;32mI (47) boot: Partition Table:[0m
+[0;32mI (50) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (62) boot:  1 nvs_key          NVS keys         01 04 0000f000 00001000[0m
+[0;32mI (69) boot:  2 otadata          OTA data         01 00 00010000 00002000[0m
+[0;32mI (75) boot:  3 phy_init         RF data          01 01 00012000 00001000[0m
+[0;32mI (82) boot:  4 nvs_certs        WiFi data        01 02 00013000 0000d000[0m
+[0;32mI (88) boot:  5 ota_0            OTA app          00 10 00020000 001c0000[0m
+[0;32mI (95) boot:  6 ota_1            OTA app          00 11 001e0000 001c0000[0m
+[0;32mI (101) boot:  7 www              Unknown data     01 81 003a0000 00060000[0m
+[0;32mI (108) boot: End of partition table[0m
+[0;32mI (112) esp_image: segment 0: paddr=00020020 vaddr=3c110020 size=64bb4h (412596) map[0m
+[0;32mI (192) esp_image: segment 1: paddr=00084bdc vaddr=3fca0800 size=054d8h ( 21720) load[0m
+[0;32mI (196) esp_image: segment 2: paddr=0008a0bc vaddr=40374000 size=05f5ch ( 24412) load[0m
+[0;32mI (202) esp_image: segment 3: paddr=00090020 vaddr=42000020 size=10559ch (1070492) map[0m
+[0;32mI (392) esp_image: segment 4: paddr=001955c4 vaddr=40379f5c size=167f0h ( 92144) load[0m
+[0;32mI (412) esp_image: segment 5: paddr=001abdbc vaddr=50000000 size=00020h (    32) load[0m
+[0;32mI (424) boot: Loaded app from partition at offset 0x20000[0m
+[0;32mI (424) boot: Disabling RNG early entropy source...[0m
+[0;32mI (434) octal_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (434) octal_psram: dev id       : 0x02 (generation 3)[0m
+[0;32mI (434) octal_psram: density      : 0x03 (64 Mbit)[0m
+[0;32mI (436) octal_psram: good-die     : 0x01 (Pass)[0m
+[0;32mI (441) octal_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (445) octal_psram: VCC          : 0x01 (3V)[0m
+[0;32mI (449) octal_psram: SRF          : 0x01 (Fast Refresh)[0m
+[0;32mI (454) octal_psram: BurstType    : 0x01 (Hybrid Wrap)[0m
+[0;32mI (459) octal_psram: BurstLen     : 0x01 (32 Byte)[0m
+[0;32mI (463) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (468) octal_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (473) esp_psram: Found 8MB PSRAM device[0m
+[0;32mI (476) esp_psram: Speed: 40MHz[0m
+[0;32mI (479) cpu_start: Multicore app[0m
+[0;32mI (1213) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (1222) cpu_start: Pro cpu start user code[0m
+[0;32mI (1222) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (1222) app_init: Application information:[0m
+[0;32mI (1222) app_init: Project name:     kc_device[0m
+[0;32mI (1227) app_init: App version:      cb8dc9f-dirty[0m
+[0;32mI (1231) app_init: Compile time:     Dec 13 2025 17:38:15[0m
+[0;32mI (1236) app_init: ELF file SHA256:  68ba4c7c4...[0m
+[0;32mI (1241) app_init: ESP-IDF:          v5.5.1[0m
+[0;32mI (1245) efuse_init: Min chip rev:     v0.0[0m
+[0;32mI (1248) efuse_init: Max chip rev:     v0.99 [0m
+[0;32mI (1253) efuse_init: Chip rev:         v0.2[0m
+[0;32mI (1257) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (1263) heap_init: At 3FCAF108 len 0003A608 (233 KiB): RAM[0m
+[0;32mI (1268) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM[0m
+[0;32mI (1273) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM[0m
+[0;32mI (1279) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM[0m
+[0;32mI (1284) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator[0m
+[0;32mI (1292) spi_flash: detected chip: gd[0m
+[0;32mI (1294) spi_flash: flash io: dio[0m
+[0;33mW (1297) spi_flash: Detected size(16384k) larger than the size in the binary image header(4096k). Using the size in the binary image header.[0m
+[0;32mI (1310) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (1316) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (1323) coexist: coex firmware version: b0bcc39[0m
+[0;32mI (1327) coexist: coexist rom version e7ae62f[0m
+[0;32mI (1331) main_task: Started on CPU0[0m
+[0;32mI (1341) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (1341) main_task: Calling app_main()[0m
+[0;32mI (1341) MAIN: ========================================[0m
+[0;32mI (1351) MAIN: KannaCloud Device - Parallel Boot v2.0[0m
+[0;32mI (1351) MAIN: ========================================[0m
+[0;32mI (1361) CHIP_INFO: ========================================[0m
+[0;32mI (1361) CHIP_INFO: Chip Information[0m
+[0;32mI (1371) CHIP_INFO: ========================================[0m
+[0;32mI (1371) CHIP_INFO: Model:         ESP32-S3[0m
+[0;32mI (1381) CHIP_INFO: Architecture:  Xtensa[0m
+[0;32mI (1381) CHIP_INFO: Revision:      v0.2[0m
+[0;32mI (1381) CHIP_INFO: CPU Cores:     2[0m
+[0;32mI (1391) CHIP_INFO: Flash Size:    4 MB[0m
+[0;32mI (1391) CHIP_INFO: Features:[0m
+[0;32mI (1391) CHIP_INFO:   - WiFi:      Yes (2.4 GHz)[0m
+[0;32mI (1401) CHIP_INFO:   - Bluetooth: No[0m
+[0;32mI (1401) CHIP_INFO:   - BLE:       Yes[0m
+[0;32mI (1401) CHIP_INFO:   - PSRAM:     Yes (8 MB)[0m
+[0;32mI (1411) CHIP_INFO: ========================================[0m
+[0;32mI (1411) CHIP_INFO: ESP-IDF Version: v5.5.1[0m
+[0;32mI (1421) CHIP_INFO: ========================================[0m
+[0;32mI (1421) MAIN: MAIN: Initializing basic hardware...[0m
+[0;32mI (1431) SECURITY: =================================[0m
+[0;32mI (1431) SECURITY: Initializing Security Features[0m
+[0;32mI (1441) SECURITY: =================================[0m
+[0;32mI (1441) SECURITY: NVS keys partition found at 0xf000 (size: 4096 bytes)[0m
+[0;32mI (1451) SECURITY: Initializing NVS with encryption...[0m
+[0;32mI (1451) SECURITY: ✓ NVS encryption keys loaded from partition[0m
+[0;32mI (1521) SECURITY: ✓ NVS encryption initialized successfully[0m
+[0;32mI (1521) SECURITY: ✓ WiFi credentials will be stored encrypted[0m
+[0;33mW (1521) SECURITY: ✗ Flash encryption is DISABLED[0m
+[0;33mW (1521) SECURITY:   Firmware and data are NOT protected in flash[0m
+[0;33mW (1531) SECURITY:   Enable flash encryption for production deployment[0m
+[0;32mI (1531) SECURITY: =================================[0m
+[0;32mI (1541) SECURITY: Security Status Summary:[0m
+[0;32mI (1541) SECURITY:   NVS Encryption:   ENABLED ✓[0m
+[0;32mI (1551) SECURITY:   Flash Encryption: DISABLED ✗[0m
+[0;32mI (1551) SECURITY:   Key Protection:   HMAC-based (eFuse)[0m
+[0;32mI (1561) SECURITY:   Security Level:   MEDIUM ✓✓[0m
+[0;32mI (1561) SECURITY: =================================[0m
+[0;32mI (1571) RESET_BTN: Initializing reset button on GPIO14[0m
+[0;32mI (1571) RESET_BTN: Reset button initialized successfully[0m
+[0;32mI (1581) RESET_BTN:   Short press (<3s): Clear WiFi credentials[0m
+[0;32mI (1581) RESET_BTN:   Long press (>=3s): Factory reset[0m
+[0;32mI (1591) MAIN: MAIN: Initializing I2C bus...[0m
+[0;32mI (1591) I2C_SCAN: Initializing I2C master bus[0m
+[0;32mI (1591) I2C_SCAN:   SDA: GPIO47, SCL: GPIO48[0m
+[0;32mI (1601) I2C_SCAN: ✓ I2C master bus initialized successfully[0m
+[0;32mI (1601) PROV_STATE: Provisioning state machine initialized[0m
+[0;32mI (1611) PROV_STATE: State change callback registered[0m
+[0;32mI (1611) MAIN: MAIN: Initializing WiFi manager...[0m
+[0;32mI (1621) WIFI_MGR: Initializing WiFi manager[0m
+[0;32mI (1621) pp: pp rom version: e7ae62f[0m
+[0;32mI (1631) net80211: net80211 rom version: e7ae62f[0m
+[0;32mI (1641) wifi:wifi driver task: 3fcbef6c, prio:23, stack:6656, core=0[0m
+[0;32mI (1661) wifi:wifi firmware version: 14da9b7[0m
+[0;32mI (1661) wifi:wifi certification version: v7.0[0m
+[0;32mI (1661) wifi:config NVS flash: enabled[0m
+[0;32mI (1661) wifi:config nano formatting: disabled[0m
+[0;32mI (1671) wifi:Init data frame dynamic rx buffer num: 32[0m
+[0;32mI (1671) wifi:Init static rx mgmt buffer num: 5[0m
+[0;32mI (1681) wifi:Init management short buffer num: 32[0m
+[0;32mI (1681) wifi:Init dynamic tx buffer num: 32[0m
+[0;32mI (1691) wifi:Init static tx FG buffer num: 2[0m
+[0;32mI (1691) wifi:Init static rx buffer size: 1600[0m
+[0;32mI (1691) wifi:Init static rx buffer num: 10[0m
+[0;32mI (1701) wifi:Init dynamic rx buffer num: 32[0m
+[0;32mI (1701) wifi_init: rx ba win: 6[0m
+[0;32mI (1711) wifi_init: accept mbox: 6[0m
+[0;32mI (1711) wifi_init: tcpip mbox: 32[0m
+[0;32mI (1711) wifi_init: udp mbox: 6[0m
+[0;32mI (1711) wifi_init: tcp mbox: 6[0m
+[0;32mI (1721) wifi_init: tcp tx win: 5760[0m
+[0;32mI (1721) wifi_init: tcp rx win: 5760[0m
+[0;32mI (1721) wifi_init: tcp mss: 1440[0m
+[0;32mI (1731) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (1731) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (1741) phy_init: phy_version 701,f4f1da3a,Mar  3 2025,15:50:10[0m
+[0;32mI (1791) wifi:mode : sta (30:30:f9:73:c5:cc)[0m
+[0;32mI (1791) wifi:enable tsf[0m
+[0;32mI (1791) WIFI_MGR: WiFi manager initialized successfully[0m
+[0;32mI (1791) WIFI_MGR: WiFi station started, attempting to connect...[0m
+[0;32mI (1791) MAIN: MAIN: Found stored credentials, attempting to connect to: AP-5GHz[0m
+[0;32mI (1801) WIFI_MGR: Connecting to WiFi SSID: AP-5GHz[0m
+[0;32mI (1811) wifi:flush txq[0m
+[0;32mI (1811) wifi:stop sw txq[0m
+[0;32mI (1811) wifi:lmac stop hw txq[0m
+[0;32mI (1821) wifi:mode : sta (30:30:f9:73:c5:cc)[0m
+[0;32mI (1821) wifi:enable tsf[0m
+[0;32mI (1821) PROV_STATE: State transition: IDLE -> WIFI_CONNECTING (Status: SUCCESS, Message: Initiating WiFi connection)[0m
+[0;32mI (1821) WIFI_MGR: WiFi station started, attempting to connect...[0m
+[0;32mI (1841) MAIN: State changed: WIFI_CONNECTING | Status: SUCCESS | Message: Initiating WiFi connection[0m
+[0;32mI (1841) MAIN: MAIN: Connecting to stored WiFi network...[0m
+[0;32mI (3051) wifi:new:<11,0>, old:<1,0>, ap:<255,255>, sta:<11,0>, prof:1, snd_ch_cfg:0x0[0m
+[0;32mI (3051) wifi:state: init -> auth (0xb0)[0m
+[0;32mI (3751) wifi:state: auth -> assoc (0x0)[0m
+[0;32mI (3761) wifi:Association refused temporarily time 1953, comeback time 2053 (TUs)[0m
+[0;32mI (5861) wifi:state: assoc -> auth (0xb0)[0m
+[0;32mI (6571) wifi:state: auth -> init (0x600)[0m
+[0;32mI (6611) wifi:new:<11,0>, old:<11,0>, ap:<255,255>, sta:<11,0>, prof:1, snd_ch_cfg:0x0[0m
+[0;32mI (6611) WIFI_MGR: WiFi disconnected (reason: 202)[0m
+[0;32mI (6611) WIFI_MGR: Retry connection attempt 1/5[0m
+[0;32mI (6611) PROV_STATE: State transition: WIFI_CONNECTING -> WIFI_CONNECTING (Status: SUCCESS, Message: Connecting... (attempt 1/5))[0m
+[0;32mI (6621) MAIN: State changed: WIFI_CONNECTING | Status: SUCCESS | Message: Connecting... (attempt 1/5)[0m
+[0;32mI (9021) WIFI_MGR: WiFi disconnected (reason: 205)[0m
+[0;32mI (9021) WIFI_MGR: Retry connection attempt 2/5[0m
+[0;32mI (9021) PROV_STATE: State transition: WIFI_CONNECTING -> WIFI_CONNECTING (Status: SUCCESS, Message: Connecting... (attempt 2/5))[0m
+[0;32mI (9031) MAIN: State changed: WIFI_CONNECTING | Status: SUCCESS | Message: Connecting... (attempt 2/5)[0m
+[0;32mI (10231) wifi:new:<11,0>, old:<11,0>, ap:<255,255>, sta:<11,0>, prof:1, snd_ch_cfg:0x0[0m
+[0;32mI (10241) wifi:state: init -> auth (0xb0)[0m
+[0;32mI (10941) wifi:state: auth -> assoc (0x0)[0m
+[0;32mI (10961) wifi:state: assoc -> run (0x10)[0m
+[0;32mI (11001) wifi:connected with AP-5GHz, aid = 23, channel 11, BW20, bssid = 72:13:01:32:b2:79[0m
+[0;32mI (11001) wifi:security: WPA3-SAE, phy: bgn, rssi: -57[0m
+[0;32mI (11041) wifi:pm start, type: 1[0m
+
+[0;32mI (11041) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us[0m
+[0;32mI (11041) wifi:set rx beacon pti, rx_bcn_pti: 14, bcn_timeout: 25000, mt_pti: 14, mt_time: 10000[0m
+[0;32mI (11051) wifi:AP's beacon interval = 102400 us, DTIM period = 1[0m
+[0;32mI (11071) wifi:<ba-add>idx:0 (ifx:0, 72:13:01:32:b2:79), tid:7, ssn:3, winSize:64[0m
+[0;32mI (12081) esp_netif_handlers: sta ip: 192.168.0.215, mask: 255.255.255.0, gw: 192.168.0.1[0m
+[0;32mI (12081) WIFI_MGR: WiFi connected! IP: 192.168.0.215[0m
+[0;32mI (12081) WIFI_MGR: Credentials saved automatically by ESP-IDF (encrypted in NVS)[0m
+[0;32mI (12081) PROV_STATE: State transition: WIFI_CONNECTING -> PROVISIONED (Status: SUCCESS, Message: 192.168.0.215)[0m
+[0;32mI (12091) MAIN: State changed: PROVISIONED | Status: SUCCESS | Message: 192.168.0.215[0m
+[0;32mI (12931) MAIN: MAIN: ✓ Connected using stored credentials[0m
+[0;32mI (12931) PROV_STATE: State transition: PROVISIONED -> PROVISIONED (Status: SUCCESS, Message: Connected using stored credentials)[0m
+[0;32mI (12931) MAIN: State changed: PROVISIONED | Status: SUCCESS | Message: Connected using stored credentials[0m
+[0;32mI (12941) MAIN: ========================================[0m
+[0;32mI (12951) MAIN: MAIN: Launching network services[0m
+[0;32mI (12951) MAIN: ========================================[0m
+[0;32mI (12961) MAIN: MAIN: Launching sensor task now...[0m
+[0;32mI (12961) MAIN: ========================================[0m
+[0;32mI (12961) MAIN: SENSOR TASK: Starting[0m
+[0;32mI (12971) MAIN: ========================================[0m
+[0;32mI (12971) MAIN: SENSOR: Waiting 3000ms for I2C sensor stabilization...[0m
+[0;32mI (12981) MAIN: MAIN: ✓ Sensor task launched (priority 5)[0m
+[0;32mI (12981) MAIN: ========================================[0m
+[0;32mI (12991) MAIN: NETWORK TASK: Starting[0m
+[0;32mI (12991) MAIN: ========================================[0m
+[0;32mI (13001) MAIN: NETWORK: ✓ WiFi connected[0m
+[0;32mI (13001) MAIN: NETWORK: Initializing NTP time synchronization...[0m
+[0;32mI (13011) TIME_SYNC: Initializing SNTP time synchronization[0m
+[0;32mI (13011) TIME_SYNC: Timezone set to: UTC (default)[0m
+[0;32mI (13021) TIME_SYNC: NTP server 0: pool.ntp.org[0m
+[0;32mI (13021) TIME_SYNC: NTP server 1: time.nist.gov[0m
+[0;32mI (13031) TIME_SYNC: NTP server 2: time.google.com[0m
+[0;32mI (13031) TIME_SYNC: SNTP initialized, waiting for time sync...[0m
+[0;32mI (13041) MAIN: NETWORK: Waiting for time synchronization...[0m
+[0;32mI (13041) MAIN: MAIN: ✓ Network task launched (priority 3)[0m
+[0;32mI (13051) MAIN: MAIN: Waiting for sensor task to complete...[0m
+[0;32mI (13281) wifi:<ba-add>idx:1 (ifx:0, 72:13:01:32:b2:79), tid:0, ssn:3, winSize:64[0m
+[0;32mI (15981) MAIN: SENSOR: Performing initial I2C scan...[0m
+[0;32mI (15981) I2C_SCAN: ========================================[0m
+[0;32mI (15981) I2C_SCAN: Scanning I2C bus for devices...[0m
+[0;32mI (15981) I2C_SCAN: ========================================[0m
+[0;32mI (15991) I2C_SCAN: ✓ Device found at address 0x16[0m
+[0;32mI (15991) I2C_SCAN: ✓ Device found at address 0x36[0m
+[0;32mI (16001) I2C_SCAN: ✓ Device found at address 0x63[0m
+[0;32mI (16001) I2C_SCAN: ✓ Device found at address 0x64[0m
+[0;32mI (16011) I2C_SCAN: ✓ Device found at address 0x6F[0m
+[0;32mI (16011) I2C_SCAN: ========================================[0m
+[0;32mI (16011) I2C_SCAN: Scan complete: 5 device(s) found[0m
+[0;32mI (16021) I2C_SCAN: ========================================[0m
+[0;32mI (16021) MAIN: SENSOR: Initializing sensor manager...[0m
+[0;32mI (16031) SENSOR_MGR: Initializing sensor manager[0m
+[0;32mI (16031) SENSOR_MGR: MAX17048 battery monitor detected at 0x36[0m
+[0;32mI (16041) MAX17048: Initializing MAX17048 battery monitor[0m
+[0;32mI (16041) MAX17048: MAX17048 chip version: 0x0012[0m
+[0;32mI (16051) SENSOR_MGR: ✓ MAX17048 initialized successfully[0m
+[0;32mI (16051) SENSOR_MGR:   Battery: 4.14 V, 93.9%[0m
+[0;32mI (16061) SENSOR_MGR: EZO sensor detected at 0x16[0m
+[0;32mI (16061) EZO_SENSOR: Initializing EZO sensor at address 0x16[0m
+[0;33mW (16671) EZO_SENSOR: Cleared stale response #1 from 0x16: ''[0m
+[0;33mW (16671) EZO_SENSOR: Cleared stale response #2 from 0x16: ''[0m
+[0;33mW (16671) EZO_SENSOR: Cleared stale response #3 from 0x16: ''[0m
+[0;33mW (16681) EZO_SENSOR: Cleared stale response #4 from 0x16: ''[0m
+[0;33mW (16681) EZO_SENSOR: Cleared stale response #5 from 0x16: ''[0m
+[0;32mI (16691) EZO_SENSOR: Successfully cleared 5 stale response(s) from 0x16[0m
+[0;32mI (16691) EZO_SENSOR: Sending command to 0x16: i[0m
+[0;32mI (16861) TIME_SYNC: ✓ Time synchronized: 2025-12-18 22:40:20[0m
+[0;32mI (16861) MAIN: ====================================[0m
+[0;32mI (16861) MAIN: Time Synchronized Successfully![0m
+[0;32mI (16871) MAIN: Current time: 2025-12-18 22:40:20 UTC[0m
+[0;32mI (16871) MAIN: ====================================[0m
+[0;32mI (17001) EZO_SENSOR: Address 0x16: Device info response: '?I,RTD,2.12'[0m
+[0;32mI (17001) EZO_SENSOR: Address 0x16: Parsed type = 'RTD'[0m
+[0;32mI (17001) EZO_SENSOR: Sending command to 0x16: Name,?[0m
+[0;32mI (17041) MAIN: NETWORK: Initializing API key manager...[0m
+[0;32mI (17041) API_KEY_MGR: Initializing API key manager[0m
+[0;32mI (17041) API_KEY_MGR: No stored API keys found[0m
+[0;32mI (17041) API_KEY_MGR: API key manager initialized with 0 keys[0m
+[0;32mI (17041) MAIN: NETWORK: Initializing cloud provisioning...[0m
+[0;32mI (17051) CLOUD_PROV: Initializing cloud provisioning[0m
+[0;32mI (17051) MAIN: NETWORK: Starting cloud provisioning (fetching certificates)...[0m
+[0;32mI (17061) CLOUD_PROV: ===========================================[0m
+[0;32mI (17071) CLOUD_PROV: Starting automatic device provisioning[0m
+[0;32mI (17071) CLOUD_PROV: ===========================================[0m
+[0;32mI (17081) CLOUD_PROV: Device already has certificates[0m
+[0;32mI (17081) MAIN: ====================================[0m
+[0;32mI (17091) MAIN: Cloud Provisioning Successful![0m
+[0;32mI (17091) MAIN: Message: Already provisioned[0m
+[0;32mI (17101) MAIN: ====================================[0m
+[0;32mI (17101) MAIN: NETWORK: ✓ Cloud provisioning complete (certificates obtained)[0m
+[0;32mI (17111) MAIN: NETWORK: Downloading MQTT CA certificate...[0m
+[0;32mI (17111) CLOUD_PROV: MQTT CA certificate already exists (1425 bytes), skipping download[0m
+[0;32mI (17121) MAIN: NETWORK: Initializing MQTT client...[0m
+[0;32mI (17131) MQTT_CLIENT: Loaded MQTT interval from NVS: 0 seconds[0m
+[0;32mI (17131) CLOUD_PROV: Using custom device name: Greenhouse #5[0m
+[0;32mI (17141) MQTT_CLIENT: Initializing MQTT client[0m
+[0;32mI (17141) MQTT_CLIENT: Broker URI: mqtts://mqtt.kannacloud.com:8883[0m
+[0;32mI (17151) MQTT_CLIENT: Device ID: kc-3030f973c5cc[0m
+[0;32mI (17151) MQTT_CLIENT: Device Name: Greenhouse #5[0m
+[0;32mI (17161) MQTT_CLIENT: Username: sensor01[0m
+[0;32mI (17161) MQTT_CLIENT: Configuring MQTTS with TLS encryption[0m
+[0;32mI (17171) MQTT_CLIENT: Loaded CA certificate for MQTTS (1424 bytes)[0m
+[0;32mI (17171) MQTT_CLIENT: Certificate START: -----BEGIN CERTIFICATE-----[0m
+MIID7TCCAtWgAwIBAgIUJ3peazJES0Y1KwBDIDqz703ItnwwDQYJKoZIhvcNAQEL
+BQAwgYUxCzAJBgNVBAYTAlVTMRAwDgYDVQQIDAdBcml6b25hMRQwEgYD
+[0;32mI (17191) MQTT_CLIENT: Certificate END: YkF[0m
+2OVAwGyyM4LaaQDVJyXcjXQ1cs5HC6nKomKRWlSCCW/bzkQgFI7V9YL9N7uq5CzF
+iw==
+-----END CERTIFICATE-----
+
+[0;32mI (17201) MQTT_CLIENT: Certificate null-terminated: YES[0m
+[0;32mI (17201) MQTT_CLIENT: ✓ TLS encryption enabled with CA certificate verification[0m
+[0;32mI (17211) MQTT_CLIENT: ✓ MQTT client initialized successfully[0m
+[0;32mI (17221) MQTT_CLIENT: Starting MQTT client...[0m
+[0;32mI (17221) MQTT_CLIENT: ✓ MQTT publish task started (publish interval: 0 seconds)[0m
+[0;32mI (17221) MQTT_CLIENT: MQTT publish task started (interval: 0 seconds)[0m
+[0;32mI (17231) MAIN: NETWORK: ✓ MQTT client started[0m
+[0;32mI (17241) MAIN: NETWORK: Initializing mDNS service...[0m
+[0;32mI (17241) MDNS: Initializing mDNS service[0m
+[0;32mI (17251) MDNS: Hostname: kc.local[0m
+[0;32mI (17251) mdns_mem: mDNS task will be created from internal RAM[0m
+[0;32mI (17261) MDNS: mDNS service started successfully[0m
+[0;32mI (17261) MDNS: Device accessible at: https://kc.local[0m
+[0;32mI (17271) MDNS: Adding HTTPS service on port 443[0m
+[0;32mI (17271) MDNS: HTTPS service added to mDNS[0m
+[0;32mI (17271) MAIN: NETWORK: Starting HTTPS dashboard server...[0m
+[0;32mI (17281) WEB_EDITOR: Initializing FATFS dashboard volume...[0m
+[0;32mI (17291) WEB_EDITOR: FATFS: total=352 KB, free=252 KB[0m
+[0;32mI (17291) HTTP_SERVER: Starting HTTPS server...[0m
+[0;32mI (17301) EZO_SENSOR: Address 0x16: Sensor name = 'test'[0m
+[0;32mI (17301) EZO_SENSOR: Sending command to 0x16: L,?[0m
+[0;32mI (17301) HTTP_SERVER: Certificate length: 1509 bytes[0m
+[0;32mI (17311) HTTP_SERVER: Private key length: 1679 bytes[0m
+[0;32mI (17311) HTTP_SERVER: Cert first 100 chars: -----BEGIN CERTIFICATE-----[0m
+MIIELjCCAxagAwIBAgIUR8aGwylXkcja/jryG9vMDL1jbZswDQYJKoZIhvcNAQEL
+BQAwgZo
+[0;32mI (17331) HTTP_SERVER: Cert last 100 chars: /vybtsC04sldpjET22Joehc0QavY2zu/pIrvtzfos5fCwe0m[0m
+XxEFT+bjKzrlECzK+VyEKDz/
+-----END CERTIFICATE-----
+
+[0;32mI (17341) esp_https_server: Starting server[0m
+[0;32mI (17351) esp_https_server: Server listening on port 443[0m
+[0;32mI (17351) HTTP_SERVER: ✓ HTTPS server started successfully[0m
+[0;32mI (17351) HTTP_SERVER: Dashboard accessible at: https://kc.local[0m
+[0;32mI (17361) HTTP_SERVER: Registered sensor + dashboard API endpoints[0m
+[0;32mI (17371) MAIN: NETWORK: ✓ HTTPS server started[0m
+[0;32mI (17371) MAIN: NETWORK: ✓ Access dashboard at: https://kc.local[0m
+[0;32mI (17381) MAIN: ========================================[0m
+[0;32mI (17381) MAIN: NETWORK: ✓ All network services started[0m
+[0;32mI (17391) MAIN: ========================================[0m
+[0;32mI (17601) esp_https_server: performing session handshake[0m
+[0;32mI (17621) EZO_SENSOR: Sending command to 0x16: Plock,?[0m
+[0;32mI (17931) EZO_SENSOR: Sending command to 0x16: S,?[0m
+[0;32mI (18251) EZO_SENSOR: EZO sensor initialized: Type=RTD, FW=2.12[0m
+[0;32mI (18251) SENSOR_MGR: ✓ EZO sensor initialized: Type=RTD, Name=test, FW=2.12[0m
+[0;32mI (18251) SENSOR_MGR:   → Temperature sensor (RTD)[0m
+[0;32mI (18251) SENSOR_MGR: Waiting 500ms before initializing next sensor...[0m
+[0;32mI (18461) MQTT_CLIENT: ✓ Connected to MQTT broker[0m
+[0;32mI (18461) MQTT_CLIENT: Subscribed to: kannacloud/sensor/kc-3030f973c5cc/cmd[0m
+[0;32mI (18461) MQTT_CLIENT: Device ready to publish sensor data[0m
+[0;32mI (18621) MQTT_CLIENT: Subscribed, msg_id=56734[0m
+[0;32mI (18671) esp_https_server: performing session handshake[0m
+[0;32mI (18781) SENSOR_MGR: EZO sensor detected at 0x63[0m
+[0;32mI (18781) EZO_SENSOR: Initializing EZO sensor at address 0x63[0m
+[0;33mW (19391) EZO_SENSOR: Cleared stale response #1 from 0x63: ''[0m
+[0;33mW (19391) EZO_SENSOR: Cleared stale response #2 from 0x63: ''[0m
+[0;33mW (19401) EZO_SENSOR: Cleared stale response #3 from 0x63: ''[0m
+[0;33mW (19401) EZO_SENSOR: Cleared stale response #4 from 0x63: ''[0m
+[0;33mW (19401) EZO_SENSOR: Cleared stale response #5 from 0x63: ''[0m
+[0;32mI (19411) EZO_SENSOR: Successfully cleared 5 stale response(s) from 0x63[0m
+[0;32mI (19411) EZO_SENSOR: Sending command to 0x63: i[0m
+[0;32mI (19721) EZO_SENSOR: Address 0x63: Device info response: '?I,pH,2.14'[0m
+[0;32mI (19721) EZO_SENSOR: Address 0x63: Parsed type = 'pH'[0m
+[0;32mI (19721) EZO_SENSOR: Sending command to 0x63: Name,?[0m
+[0;32mI (20021) EZO_SENSOR: Address 0x63: Sensor name = 'pH_02'[0m
+[0;32mI (20021) EZO_SENSOR: Sending command to 0x63: L,?[0m
+[0;32mI (20321) EZO_SENSOR: Sending command to 0x63: Plock,?[0m
+[0;32mI (20621) EZO_SENSOR: Sending command to 0x63: pHext,?[0m
+[0;32mI (20921) EZO_SENSOR: EZO sensor initialized: Type=pH, FW=2.14[0m
+[0;32mI (20921) SENSOR_MGR: ✓ EZO sensor initialized: Type=pH, Name=pH_02, FW=2.14[0m
+[0;32mI (20921) SENSOR_MGR:   → pH sensor[0m
+[0;32mI (20921) SENSOR_MGR: Waiting 500ms before initializing next sensor...[0m
+[0;32mI (21431) SENSOR_MGR: EZO sensor detected at 0x64[0m
+[0;32mI (21431) EZO_SENSOR: Initializing EZO sensor at address 0x64[0m
+[0;33mW (22031) EZO_SENSOR: Cleared stale response #1 from 0x64: ''[0m
+[0;33mW (22031) EZO_SENSOR: Cleared stale response #2 from 0x64: ''[0m
+[0;33mW (22031) EZO_SENSOR: Cleared stale response #3 from 0x64: ''[0m
+[0;33mW (22041) EZO_SENSOR: Cleared stale response #4 from 0x64: ''[0m
+[0;33mW (22041) EZO_SENSOR: Cleared stale response #5 from 0x64: ''[0m
+[0;32mI (22041) EZO_SENSOR: Successfully cleared 5 stale response(s) from 0x64[0m
+[0;32mI (22051) EZO_SENSOR: Sending command to 0x64: i[0m
+[0;32mI (22361) EZO_SENSOR: Address 0x64: Device info response: '?I,EC,2.17'[0m
+[0;32mI (22361) EZO_SENSOR: Address 0x64: Parsed type = 'EC'[0m
+[0;32mI (22361) EZO_SENSOR: Sending command to 0x64: Name,?[0m
+[0;32mI (22661) EZO_SENSOR: Address 0x64: Sensor name = 'EC_01'[0m
+[0;32mI (22661) EZO_SENSOR: Sending command to 0x64: L,?[0m
+[0;32mI (22961) EZO_SENSOR: Sending command to 0x64: Plock,?[0m
+[0;32mI (23261) EZO_SENSOR: Sending command to 0x64: K,?[0m
+[0;32mI (23561) EZO_SENSOR: Sending command to 0x64: TDS,?[0m
+[0;32mI (23861) EZO_SENSOR: EZO sensor initialized: Type=EC, FW=2.17[0m
+[0;32mI (23861) SENSOR_MGR: ✓ EZO sensor initialized: Type=EC, Name=EC_01, FW=2.17[0m
+[0;32mI (23861) SENSOR_MGR:   → Electrical Conductivity sensor[0m
+[0;32mI (23861) SENSOR_MGR: Waiting 500ms before initializing next sensor...[0m
+[0;32mI (24371) SENSOR_MGR: Waiting 500ms before initializing next sensor...[0m
+[0;32mI (24871) SENSOR_MGR: EZO sensor detected at 0x6F[0m
+[0;32mI (24871) EZO_SENSOR: Initializing EZO sensor at address 0x6F[0m
+[0;33mW (25471) EZO_SENSOR: Cleared stale response #1 from 0x6F: ''[0m
+[0;33mW (25471) EZO_SENSOR: Cleared stale response #2 from 0x6F: ''[0m
+[0;33mW (25481) EZO_SENSOR: Cleared stale response #3 from 0x6F: ''[0m
+[0;33mW (25481) EZO_SENSOR: Cleared stale response #4 from 0x6F: ''[0m
+[0;33mW (25481) EZO_SENSOR: Cleared stale response #5 from 0x6F: ''[0m
+[0;32mI (25481) EZO_SENSOR: Successfully cleared 5 stale response(s) from 0x6F[0m
+[0;32mI (25491) EZO_SENSOR: Sending command to 0x6F: i[0m
+[0;32mI (25801) EZO_SENSOR: Address 0x6F: Device info response: '?I,HUM,1.0'[0m
+[0;32mI (25801) EZO_SENSOR: Address 0x6F: Parsed type = 'HUM'[0m
+[0;32mI (25801) EZO_SENSOR: Sending command to 0x6F: Name,?[0m
+[0;32mI (26101) EZO_SENSOR: Sending command to 0x6F: L,?[0m
+[0;32mI (26401) EZO_SENSOR: Sending command to 0x6F: Plock,?[0m
+[0;32mI (26701) EZO_SENSOR: Address 0x6F: Configuring HUM sensor (type verified: 'HUM')[0m
+[0;32mI (26701) EZO_SENSOR: Sending command to 0x6F: O,?[0m
+[0;32mI (27001) EZO_SENSOR: Address 0x6F: HUM param response: '?O,HUM,T,DEW'[0m
+[0;32mI (27001) EZO_SENSOR: HUM sensor has 3 parameters enabled[0m
+[0;32mI (27001) EZO_SENSOR: Address 0x6F: After HUM config, type still = 'HUM'[0m
+[0;32mI (27011) EZO_SENSOR: EZO sensor initialized: Type=HUM, FW=1.0[0m
+[0;32mI (27011) SENSOR_MGR: ✓ EZO sensor initialized: Type=HUM, Name=, FW=1.0[0m
+[0;32mI (27021) SENSOR_MGR:   → Humidity sensor[0m
+[0;32mI (27021) SENSOR_MGR: Sensor manager initialized: Battery=YES, EZO sensors=4[0m
+[0;32mI (27031) SENSOR_MGR: Refreshing settings for 4 EZO sensor(s)[0m
+[0;32mI (27031) EZO_SENSOR: Sending command to 0x16: Cal,?[0m
+[0;32mI (27391) EZO_SENSOR: Sending command to 0x63: Cal,?[0m
+[0;32mI (27691) EZO_SENSOR: Sending command to 0x63: T,?[0m
+[0;32mI (27991) EZO_SENSOR: Sending command to 0x63: C,?[0m
+[0;32mI (28341) EZO_SENSOR: Sending command to 0x64: Cal,?[0m
+[0;32mI (28641) EZO_SENSOR: Sending command to 0x64: C,?[0m
+[0;32mI (29041) MAIN: SENSOR: ✓ Sensor manager initialized successfully[0m
+[0;32mI (29041) MAIN: SENSOR: Performing final I2C verification scan...[0m
+[0;32mI (29041) I2C_SCAN: ========================================[0m
+[0;32mI (29041) I2C_SCAN: Scanning I2C bus for devices...[0m
+[0;32mI (29051) I2C_SCAN: ========================================[0m
+[0;32mI (29061) I2C_SCAN: ✓ Device found at address 0x16[0m
+[0;32mI (29061) I2C_SCAN: ✓ Device found at address 0x36[0m
+[0;32mI (29071) I2C_SCAN: ✓ Device found at address 0x63[0m
+[0;32mI (29071) I2C_SCAN: ✓ Device found at address 0x64[0m
+[0;32mI (29071) I2C_SCAN: ✓ Device found at address 0x6F[0m
+[0;32mI (29081) I2C_SCAN: ========================================[0m
+[0;32mI (29081) I2C_SCAN: Scan complete: 5 device(s) found[0m
+[0;32mI (29081) I2C_SCAN: ========================================[0m
+[0;32mI (29091) MAIN: ========================================[0m
+[0;32mI (29101) MAIN: SENSOR INVENTORY:[0m
+[0;32mI (29101) MAIN:   Battery Monitor: YES[0m
+[0;32mI (29101) MAIN:   EZO Sensors: 4[0m
+[0;32mI (29101) MAIN: ========================================[0m
+[0;32mI (29111) MAIN: SENSOR: Starting sensor reading task...[0m
+[0;32mI (29121) SENSOR_MGR: Loaded sensor interval from NVS: 2 seconds[0m
+[0;32mI (29121) SENSOR_MGR: Sensor reading task started[0m
+[0;32mI (29121) SENSOR_MGR: Sensor reading task started (interval: 2 seconds)[0m
+[0;32mI (29131) MAIN: SENSOR: ✓ Sensor task complete, signaling SENSORS_READY[0m
+[0;32mI (29131) SENSOR_MGR: Waiting 2 seconds for sensor initialization to stabilize...[0m
+[0;32mI (29141) MAIN: MAIN: ✓ Sensors ready[0m
+[0;32mI (29151) MAIN: MAIN: ✓ Network services ready[0m
+[0;32mI (29151) MAIN: ========================================[0m
+[0;32mI (29161) MAIN: MAIN: ✓ Boot complete, entering normal operation[0m
+[0;32mI (29161) MAIN: ========================================[0m
+[0;32mI (31151) SENSOR_MGR: Starting sensor reading loop[0m
+[0;32mI (31151) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (31171) EZO_SENSOR: Sending command to 0x63: RT,25.00[0m
+[0;32mI (31191) EZO_SENSOR: Sending command to 0x64: RT,25.00[0m
+[0;32mI (31211) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (32231) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (32251) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.13[0m
+[0;32mI (32271) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1285.00[0m
+[0;32mI (32291) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.91,...[0m
+[0;32mI (32311) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (32311) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (32311) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.836999893188477,"pH":7.1339998245239258,"EC":1285,"HUM":{"humidity":41.9099998474121,"air_temp":22.530000686645508,"dew_point":8.9899997711181641}},"battery":93.86328125,"rssi":-59}[0m
+[0;32mI (32341) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (34311) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (34331) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (34351) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (34371) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (35391) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (35411) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (35431) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (35451) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.90,...[0m
+[0;32mI (35471) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (35471) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (35471) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.8390007019043,"pH":7.1459999084472656,"EC":1372,"HUM":{"humidity":41.9000015258789,"air_temp":22.530000686645508,"dew_point":8.9899997711181641}},"battery":93.86328125,"rssi":-59}[0m
+[0;32mI (35501) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (37471) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (37491) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (37511) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (37531) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (38551) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (38571) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (38591) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (38611) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.78,...[0m
+[0;32mI (38631) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (38631) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (38631) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.840000152587891,"pH":7.14799976348877,"EC":1372,"HUM":{"humidity":41.779998779296875,"air_temp":22.520000457763672,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (38661) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (40631) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (40651) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (40671) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (40691) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (41711) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (41731) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (41751) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (41771) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.69,...[0m
+[0;32mI (41791) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (41791) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (41791) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.841999053955078,"pH":7.1380000114440918,"EC":1372,"HUM":{"humidity":41.689998626708984,"air_temp":22.530000686645508,"dew_point":8.9200000762939453}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (41821) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (43791) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (43811) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (43831) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (43851) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (44871) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (44891) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (44911) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (44931) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.73,...[0m
+[0;32mI (44951) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (44951) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (44951) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.8430004119873,"pH":7.1459999084472656,"EC":1372,"HUM":{"humidity":41.729999542236328,"air_temp":22.540000915527344,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (44981) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (46951) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (46971) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (46991) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (47011) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (47491) esp_https_server: performing session handshake[0m
+[0;32mI (48031) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (48051) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (48071) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (48091) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.78,...[0m
+[0;32mI (48111) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (48111) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (48111) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.8439998626709,"pH":7.15399980545044,"EC":1372,"HUM":{"humidity":41.779998779296875,"air_temp":22.540000915527344,"dew_point":8.96000003814697}},"battery":93.86328125,"rssi":-59}[0m
+[0;32mI (48141) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (48611) HTTP_SERVER: WS client added (fd=60, slot=0)[0m
+[0;32mI (50111) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (50131) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (50151) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (50171) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (51191) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (51211) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (51231) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (51251) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.01,...[0m
+[0;32mI (51271) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (51271) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (51271) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.8430004119873,"pH":7.14900016784668,"EC":1372,"HUM":{"humidity":42.0099983215332,"air_temp":22.520000457763672,"dew_point":9.02000045776367}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (51301) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (53271) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (53291) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (53311) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (53331) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (54351) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.84[0m
+[0;32mI (54371) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (54391) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (54411) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.13,...[0m
+[0;32mI (54431) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (54431) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (54431) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.8439998626709,"pH":7.1469998359680176,"EC":1373,"HUM":{"humidity":42.130001068115234,"air_temp":22.530000686645508,"dew_point":9.06999969482422}},"battery":93.86328125,"rssi":-57}[0m
+[0;32mI (54461) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (56431) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (56451) EZO_SENSOR: Sending command to 0x63: RT,21.84[0m
+[0;32mI (56471) EZO_SENSOR: Sending command to 0x64: RT,21.84[0m
+[0;32mI (56491) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (57511) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (57531) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.13[0m
+[0;32mI (57551) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (57571) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.16,...[0m
+[0;32mI (57591) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (57591) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (57591) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847999572753906,"pH":7.1339998245239258,"EC":1372,"HUM":{"humidity":42.1599998474121,"air_temp":22.530000686645508,"dew_point":9.0799999237060547}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (57621) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;33mW (59361) httpd_uri: httpd_uri: URI '/api/sensors/find/22' not found[0m
+[0;33mW (59361) httpd_txrx: httpd_resp_send_err: 404 Not Found - Nothing matches the given URI[0m
+[0;32mI (59591) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (59611) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (59631) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (59651) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (60671) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (60691) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (60711) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (60731) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.24,...[0m
+[0;32mI (60751) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (60751) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (60751) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847999572753906,"pH":7.1459999084472656,"EC":1372,"HUM":{"humidity":42.2400016784668,"air_temp":22.530000686645508,"dew_point":9.1099996566772461}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (60781) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (62751) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (62771) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (62791) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (62811) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (63831) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (63851) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (63871) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (63891) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.29,...[0m
+[0;32mI (63911) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (63911) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (63911) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.849000930786133,"pH":7.14799976348877,"EC":1372,"HUM":{"humidity":42.290000915527344,"air_temp":22.540000915527344,"dew_point":9.1400003433227539}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (63941) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (65911) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (65931) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (65951) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (65971) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (66991) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (67011) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (67031) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (67051) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.31,...[0m
+[0;32mI (67071) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (67071) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (67071) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847999572753906,"pH":7.1469998359680176,"EC":1372,"HUM":{"humidity":42.310001373291016,"air_temp":22.530000686645508,"dew_point":9.13000011444092}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (67101) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (69071) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (69091) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (69111) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (69131) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (70151) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (70171) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (70191) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (70211) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.15,...[0m
+[0;32mI (70231) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (70231) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (70231) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847999572753906,"pH":7.1389999389648438,"EC":1372,"HUM":{"humidity":42.1500015258789,"air_temp":22.530000686645508,"dew_point":9.0799999237060547}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (70261) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (72231) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (72251) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (72271) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (72291) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (73311) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (73331) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (73351) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (73371) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.10,...[0m
+[0;32mI (73391) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (73391) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (73391) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847000122070312,"pH":7.1409997940063477,"EC":1373,"HUM":{"humidity":42.0999984741211,"air_temp":22.530000686645508,"dew_point":9.0600004196167}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (73421) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (75391) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (75411) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (75431) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (75451) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (76471) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (76491) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (76511) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (76531) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.04,...[0m
+[0;32mI (76551) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (76551) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (76551) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.847999572753906,"pH":7.1449999809265137,"EC":1373,"HUM":{"humidity":42.040000915527344,"air_temp":22.530000686645508,"dew_point":9.03999996185303}},"battery":93.86328125,"rssi":-59}[0m
+[0;32mI (76581) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (78551) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (78571) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (78591) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (78611) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (79631) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (79651) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (79671) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (79691) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.99,...[0m
+[0;32mI (79711) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (79711) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (79711) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.849000930786133,"pH":7.1500000953674316,"EC":1372,"HUM":{"humidity":41.9900016784668,"air_temp":22.520000457763672,"dew_point":9.0100002288818359}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (79741) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (81711) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (81731) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (81751) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (81771) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (82791) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (82811) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (82831) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (82851) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.94,...[0m
+[0;32mI (82871) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (82871) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (82871) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.849000930786133,"pH":7.1459999084472656,"EC":1373,"HUM":{"humidity":41.939998626708984,"air_temp":22.530000686645508,"dew_point":9}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (82901) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (84871) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (84891) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (84911) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (84931) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (85951) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (85971) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (85991) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (86011) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.87,...[0m
+[0;32mI (86031) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (86031) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (86031) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.850000381469727,"pH":7.1459999084472656,"EC":1373,"HUM":{"humidity":41.869998931884766,"air_temp":22.530000686645508,"dew_point":8.97999954223633}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (86061) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (88031) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (88051) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (88071) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (88091) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (89111) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (89131) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (89151) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (89171) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.78,...[0m
+[0;32mI (89191) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (89191) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (89191) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.85099983215332,"pH":7.1449999809265137,"EC":1373,"HUM":{"humidity":41.779998779296875,"air_temp":22.520000457763672,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (89221) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (91191) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (91211) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (91231) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (91251) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (92271) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (92291) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (92311) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (92331) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.76,...[0m
+[0;32mI (92351) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (92351) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (92351) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.85099983215332,"pH":7.1350002288818359,"EC":1373,"HUM":{"humidity":41.7599983215332,"air_temp":22.520000457763672,"dew_point":8.93000030517578}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (92381) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (94351) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (94371) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (94391) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (94411) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (95431) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (95451) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.13[0m
+[0;32mI (95471) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (95491) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.74,...[0m
+[0;32mI (95511) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (95511) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (95511) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.85099983215332,"pH":7.1329998970031738,"EC":1373,"HUM":{"humidity":41.7400016784668,"air_temp":22.530000686645508,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (95541) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (97511) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (97531) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (97551) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (97571) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (98591) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (98611) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (98631) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (98651) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.73,...[0m
+[0;32mI (98671) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (98671) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (98671) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.851999282836914,"pH":7.1440000534057617,"EC":1373,"HUM":{"humidity":41.729999542236328,"air_temp":22.530000686645508,"dew_point":8.93000030517578}},"battery":93.86328125,"rssi":-58}[0m
+[0;32mI (98701) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (100671) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (100691) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (100711) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (100731) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (101751) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (101771) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (101791) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (101811) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.74,...[0m
+[0;32mI (101831) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (101831) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (101831) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.85099983215332,"pH":7.1449999809265137,"EC":1372,"HUM":{"humidity":41.7400016784668,"air_temp":22.540000915527344,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (101861) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (103831) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (103851) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (103871) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (103891) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (104911) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (104931) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (104951) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (104971) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.73,...[0m
+[0;32mI (104991) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (104991) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (104991) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.85099983215332,"pH":7.1459999084472656,"EC":1372,"HUM":{"humidity":41.729999542236328,"air_temp":22.530000686645508,"dew_point":8.93000030517578}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (105021) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;33mW (106881) httpd_uri: httpd_uri: URI '/api/sensors/export/22' not found[0m
+[0;33mW (106881) httpd_txrx: httpd_resp_send_err: 404 Not Found - Nothing matches the given URI[0m
+[0;32mI (106991) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (107011) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (107031) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (107051) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (108071) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (108091) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (108111) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (108131) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.72,...[0m
+[0;32mI (108151) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (108151) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (108151) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.850000381469727,"pH":7.1440000534057617,"EC":1372,"HUM":{"humidity":41.720001220703125,"air_temp":22.520000457763672,"dew_point":8.9200000762939453}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (108181) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (110151) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (110171) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (110191) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (110211) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (111231) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (111251) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (111271) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (111291) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.76,...[0m
+[0;32mI (111311) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (111311) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (111311) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.851999282836914,"pH":7.1469998359680176,"EC":1372,"HUM":{"humidity":41.7599983215332,"air_temp":22.530000686645508,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (111341) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (113311) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (113331) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (113351) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (113371) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (114391) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (114411) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (114431) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (114451) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.77,...[0m
+[0;32mI (114471) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (114471) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (114471) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.853000640869141,"pH":7.1500000953674316,"EC":1372,"HUM":{"humidity":41.770000457763672,"air_temp":22.530000686645508,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (114501) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (116401) esp_https_server: performing session handshake[0m
+[0;32mI (116511) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (116561) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (116611) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (116661) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (117711) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (117731) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (117751) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (117771) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.75,...[0m
+[0;32mI (117791) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (117791) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (117791) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854000091552734,"pH":7.1440000534057617,"EC":1373,"HUM":{"humidity":41.75,"air_temp":22.530000686645508,"dew_point":8.9399995803833}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (117821) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (119791) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (119811) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (119831) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (119851) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (120871) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (120891) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (120911) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (120931) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.81,...[0m
+[0;32mI (120951) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (120951) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (120951) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.853000640869141,"pH":7.14900016784668,"EC":1373,"HUM":{"humidity":41.810001373291016,"air_temp":22.540000915527344,"dew_point":8.97000026702881}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (120981) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (122951) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (122971) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (122991) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (123011) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (124031) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (124051) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (124071) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (124091) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.89,...[0m
+[0;32mI (124111) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (124111) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (124111) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854000091552734,"pH":7.1449999809265137,"EC":1372,"HUM":{"humidity":41.889999389648438,"air_temp":22.530000686645508,"dew_point":8.9899997711181641}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (124141) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (126111) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (126131) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (126151) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (126171) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (127191) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (127211) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (127231) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (127251) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.92,...[0m
+[0;32mI (127271) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (127271) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (127271) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854999542236328,"pH":7.1459999084472656,"EC":1372,"HUM":{"humidity":41.919998168945312,"air_temp":22.530000686645508,"dew_point":9}},"battery":93.86328125,"rssi":-60}[0m
+[0;32mI (127301) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (129271) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (129291) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (129311) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (129331) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (130351) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (130371) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (130391) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (130411) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.96,...[0m
+[0;32mI (130431) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (130431) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (130431) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854000091552734,"pH":7.1469998359680176,"EC":1373,"HUM":{"humidity":41.959999084472656,"air_temp":22.540000915527344,"dew_point":9.02000045776367}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (130461) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (132431) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (132451) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (132471) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (132491) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (133511) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (133531) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (133551) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (133571) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.95,...[0m
+[0;32mI (133591) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (133591) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (133591) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854999542236328,"pH":7.1459999084472656,"EC":1373,"HUM":{"humidity":41.950000762939453,"air_temp":22.530000686645508,"dew_point":9.0100002288818359}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (133621) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (135591) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (135611) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (135631) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (135651) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (136671) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (136691) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (136711) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (136731) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.97,...[0m
+[0;32mI (136751) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (136751) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (136751) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854000091552734,"pH":7.1459999084472656,"EC":1373,"HUM":{"humidity":41.970001220703125,"air_temp":22.530000686645508,"dew_point":9.0100002288818359}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (136781) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (138751) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (138771) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (138791) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (138811) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (139831) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (139851) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (139871) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (139891) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.98,...[0m
+[0;32mI (139911) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (139911) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (139911) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854999542236328,"pH":7.1449999809265137,"EC":1373,"HUM":{"humidity":41.979999542236328,"air_temp":22.520000457763672,"dew_point":9.0100002288818359}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (139941) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (141911) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (141931) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (141951) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (141971) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (142991) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (143011) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (143031) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (143051) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.98,...[0m
+[0;32mI (143071) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (143071) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (143071) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854999542236328,"pH":7.1519999504089355,"EC":1372,"HUM":{"humidity":41.979999542236328,"air_temp":22.530000686645508,"dew_point":9.02000045776367}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (143101) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (145071) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (145091) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (145111) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (145131) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (146151) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.85[0m
+[0;32mI (146171) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (146191) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (146211) EZO_SENSOR: Sensor 0x6F fetch 3 values: 41.95,...[0m
+[0;32mI (146231) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (146231) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (146231) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.854999542236328,"pH":7.1449999809265137,"EC":1373,"HUM":{"humidity":41.950000762939453,"air_temp":22.530000686645508,"dew_point":9.0100002288818359}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (146261) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (148231) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (148251) EZO_SENSOR: Sending command to 0x63: RT,21.85[0m
+[0;32mI (148271) EZO_SENSOR: Sending command to 0x64: RT,21.85[0m
+[0;32mI (148291) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (149311) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.86[0m
+[0;32mI (149331) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.14[0m
+[0;32mI (149351) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1373.00[0m
+[0;32mI (149371) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.04,...[0m
+[0;32mI (149391) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (149391) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (149391) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.856000900268555,"pH":7.1399998664855957,"EC":1373,"HUM":{"humidity":42.040000915527344,"air_temp":22.530000686645508,"dew_point":9.03999996185303}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (149421) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (151391) EZO_SENSOR: Sending command to 0x16: R[0m
+[0;32mI (151411) EZO_SENSOR: Sending command to 0x63: RT,21.86[0m
+[0;32mI (151431) EZO_SENSOR: Sending command to 0x64: RT,21.86[0m
+[0;32mI (151451) EZO_SENSOR: Sending command to 0x6F: R[0m
+[0;32mI (152471) EZO_SENSOR: Sensor 0x16 fetch 1 values: 21.86[0m
+[0;32mI (152491) EZO_SENSOR: Sensor 0x63 fetch 1 values: 7.15[0m
+[0;32mI (152511) EZO_SENSOR: Sensor 0x64 fetch 1 values: 1372.00[0m
+[0;32mI (152531) EZO_SENSOR: Sensor 0x6F fetch 3 values: 42.03,...[0m
+[0;32mI (152551) SENSOR_MGR: ✓ Cache updated (4/4 sensors valid)[0m
+[0;32mI (152551) SENSOR_MGR: Triggering MQTT publish (on-read mode)[0m
+[0;32mI (152551) MQTT_CLIENT: Publishing JSON: {"device_id":"kc-3030f973c5cc","device_name":"Greenhouse #5","sensors":{"RTD":21.857000350952148,"pH":7.14799976348877,"EC":1372,"HUM":{"humidity":42.029998779296875,"air_temp":22.540000915527344,"dew_point":9.03999996185303}},"battery":93.86328125,"rssi":-61}[0m
+[0;32mI (152581) MQTT_CLIENT: ✓ MQTT data published successfully[0m
+[0;32mI (154551) EZO_SENSOR: Sendin
