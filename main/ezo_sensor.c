@@ -240,6 +240,12 @@ esp_err_t ezo_sensor_refresh_settings(ezo_sensor_t *sensor) {
         }
     }
 
+    // Re-query device info to refresh ALL settings including output parameters
+    esp_err_t info_ret = ezo_sensor_get_device_info(sensor);
+    if (info_ret != ESP_OK && overall == ESP_OK) {
+        overall = info_ret;
+    }
+
     // Sleep state cannot be queried; assume awake unless explicitly changed elsewhere.
 
     return overall;
@@ -350,6 +356,57 @@ esp_err_t ezo_sensor_get_device_info(ezo_sensor_t *sensor) {
     } else if (strcmp(sensor->config.type, EZO_TYPE_EC) == 0) {
         ezo_ec_get_probe_type(sensor, &sensor->config.ec.probe_type);
         ezo_ec_get_tds_factor(sensor, &sensor->config.ec.tds_conversion_factor);
+        
+        // Query which output parameters are enabled
+        char param_response[EZO_LARGEST_STRING] = {0};
+        ret = ezo_sensor_send_command(sensor, "O,?", param_response, sizeof(param_response), EZO_SHORT_WAIT_MS);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "Address 0x%02X: EC param response: '%s'", sensor->config.i2c_address, param_response);
+            
+            // Parse response: ?O,EC,TDS,S,SG or ?O,Cond,TDS,Sal,SG etc.
+            sensor->config.ec.param_ec = false;
+            sensor->config.ec.param_tds = false;
+            sensor->config.ec.param_s = false;
+            sensor->config.ec.param_sg = false;
+            
+            // Make a copy for strtok since it modifies the string
+            char response_copy[EZO_LARGEST_STRING];
+            strncpy(response_copy, param_response, sizeof(response_copy) - 1);
+            response_copy[sizeof(response_copy) - 1] = '\0';
+            
+            char *param_token = strtok(response_copy, ",");
+            int param_field = 0;
+            
+            while (param_token != NULL) {
+                ESP_LOGI(TAG, "EC param field %d: '%s'", param_field, param_token);
+                if (param_field == 0 && strcmp(param_token, "?O") == 0) {
+                    // Valid output query response
+                } else if (param_field > 0) {
+                    // Check for various possible parameter names
+                    if (strcmp(param_token, "EC") == 0 || strcmp(param_token, "Cond") == 0 || strcmp(param_token, "ec") == 0) {
+                        sensor->config.ec.param_ec = true;
+                        ESP_LOGI(TAG, "Detected EC parameter: '%s'", param_token);
+                    } else if (strcmp(param_token, "TDS") == 0 || strcmp(param_token, "tds") == 0) {
+                        sensor->config.ec.param_tds = true;
+                        ESP_LOGI(TAG, "Detected TDS parameter: '%s'", param_token);
+                    } else if (strcmp(param_token, "S") == 0 || strcmp(param_token, "Sal") == 0 || strcmp(param_token, "s") == 0) {
+                        sensor->config.ec.param_s = true;
+                        ESP_LOGI(TAG, "Detected Salinity parameter: '%s'", param_token);
+                    } else if (strcmp(param_token, "SG") == 0 || strcmp(param_token, "sg") == 0) {
+                        sensor->config.ec.param_sg = true;
+                        ESP_LOGI(TAG, "Detected SG parameter: '%s'", param_token);
+                    } else {
+                        ESP_LOGW(TAG, "Unknown EC parameter: '%s'", param_token);
+                    }
+                }
+                param_token = strtok(NULL, ",");
+                param_field++;
+            }
+            
+            ESP_LOGI(TAG, "EC outputs: EC=%d TDS=%d S=%d SG=%d", 
+                     sensor->config.ec.param_ec, sensor->config.ec.param_tds,
+                     sensor->config.ec.param_s, sensor->config.ec.param_sg);
+        }
     } else if (strcmp(sensor->config.type, EZO_TYPE_HUM) == 0) {
         ESP_LOGI(TAG, "Address 0x%02X: Configuring HUM sensor (type verified: '%s')", 
                  sensor->config.i2c_address, sensor->config.type);
@@ -1189,17 +1246,6 @@ esp_err_t ezo_rtd_set_output_parameter(ezo_sensor_t *sensor, const char *param, 
     return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
 }
 
-esp_err_t ezo_hum_set_output_parameter(ezo_sensor_t *sensor, const char *param, bool enabled) {
-    if (sensor == NULL || param == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    char command[32];
-    snprintf(command, sizeof(command), "O,%s,%d", param, enabled ? 1 : 0);
-    
-    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
-}
-
 esp_err_t ezo_ph_set_output_parameter(ezo_sensor_t *sensor, const char *param, bool enabled) {
     if (sensor == NULL || param == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -1430,4 +1476,27 @@ esp_err_t ezo_ec_set_tds_lock(ezo_sensor_t *sensor, bool locked) {
     const char *command = locked ? "TDS,lock" : "TDS,unlock";
     
     return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_hum_set_output_parameter(ezo_sensor_t *sensor, const char *param, bool enabled) {
+    if (sensor == NULL || param == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(sensor->config.type, EZO_TYPE_HUM) != 0) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    char command[32];
+    snprintf(command, sizeof(command), "O,%s,%d", param, enabled ? 1 : 0);
+    
+    return ezo_sensor_send_command(sensor, command, NULL, 0, EZO_SHORT_WAIT_MS);
+}
+
+esp_err_t ezo_sensor_memory_clear(ezo_sensor_t *sensor) {
+    if (sensor == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    return ezo_sensor_send_command(sensor, "M,clear", NULL, 0, EZO_SHORT_WAIT_MS);
 }

@@ -244,6 +244,7 @@ static void mqtt_publish_task(void *arg)
                     if (sensor->value_count >= 1) cJSON_AddNumberToObject(sensor_obj, "conductivity", sensor->values[0]);
                     if (sensor->value_count >= 2) cJSON_AddNumberToObject(sensor_obj, "tds", sensor->values[1]);
                     if (sensor->value_count >= 3) cJSON_AddNumberToObject(sensor_obj, "salinity", sensor->values[2]);
+                    if (sensor->value_count >= 4) cJSON_AddNumberToObject(sensor_obj, "specific_gravity", sensor->values[3]);
                 } else if (strcmp(sensor->sensor_type, "DO") == 0) {
                     if (sensor->value_count >= 1) cJSON_AddNumberToObject(sensor_obj, "dissolved_oxygen", sensor->values[0]);
                     if (sensor->value_count >= 2) cJSON_AddNumberToObject(sensor_obj, "saturation", sensor->values[1]);

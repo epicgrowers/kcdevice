@@ -814,6 +814,14 @@ static cJSON *build_sensor_json(ezo_sensor_t *sensor, int index, bool include_ru
     } else if (strcmp(sensor->config.type, EZO_TYPE_EC) == 0) {
         cJSON_AddNumberToObject(obj, "probe_type", sensor->config.ec.probe_type);
         cJSON_AddNumberToObject(obj, "tds_factor", sensor->config.ec.tds_conversion_factor);
+        cJSON_AddBoolToObject(obj, "param_ec", sensor->config.ec.param_ec);
+        cJSON_AddBoolToObject(obj, "param_tds", sensor->config.ec.param_tds);
+        cJSON_AddBoolToObject(obj, "param_s", sensor->config.ec.param_s);
+        cJSON_AddBoolToObject(obj, "param_sg", sensor->config.ec.param_sg);
+    } else if (strcmp(sensor->config.type, EZO_TYPE_HUM) == 0) {
+        cJSON_AddBoolToObject(obj, "param_hum", sensor->config.hum.param_hum);
+        cJSON_AddBoolToObject(obj, "param_t", sensor->config.hum.param_t);
+        cJSON_AddBoolToObject(obj, "param_dew", sensor->config.hum.param_dew);
     }
 
     if (include_runtime) {
@@ -2547,6 +2555,178 @@ static esp_err_t api_sensor_ec_output_params_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    // Re-query sensor to get updated output parameter state
+    char param_response[EZO_LARGEST_STRING] = {0};
+    ret = ezo_sensor_send_command(sensor, "O,?", param_response, sizeof(param_response), EZO_SHORT_WAIT_MS);
+    if (ret == ESP_OK) {
+        sensor->config.ec.param_ec = false;
+        sensor->config.ec.param_tds = false;
+        sensor->config.ec.param_s = false;
+        sensor->config.ec.param_sg = false;
+        
+        char response_copy[EZO_LARGEST_STRING];
+        strncpy(response_copy, param_response, sizeof(response_copy) - 1);
+        response_copy[sizeof(response_copy) - 1] = '\0';
+        
+        char *param_token = strtok(response_copy, ",");
+        int param_field = 0;
+        
+        while (param_token != NULL) {
+            if (param_field > 0) {
+                if (strcmp(param_token, "EC") == 0 || strcmp(param_token, "Cond") == 0) {
+                    sensor->config.ec.param_ec = true;
+                } else if (strcmp(param_token, "TDS") == 0) {
+                    sensor->config.ec.param_tds = true;
+                } else if (strcmp(param_token, "S") == 0 || strcmp(param_token, "Sal") == 0) {
+                    sensor->config.ec.param_s = true;
+                } else if (strcmp(param_token, "SG") == 0) {
+                    sensor->config.ec.param_sg = true;
+                }
+            }
+            param_token = strtok(NULL, ",");
+            param_field++;
+        }
+    }
+
+    esp_err_t resp = send_sensor_success_response(req, sensor);
+    sensor_read_guard_release(&guard);
+    return resp;
+}
+
+static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/hum-output-params/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    char *raw = malloc(req->content_len + 1);
+    if (!raw) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    int ret_len = httpd_req_recv(req, raw, req->content_len);
+    if (ret_len <= 0) {
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to read request body");
+        return ESP_FAIL;
+    }
+    raw[ret_len] = '\0';
+
+    cJSON *payload = cJSON_Parse(raw);
+    if (!payload) {
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ESP_OK;
+
+    cJSON *hum_item = cJSON_GetObjectItem(payload, "hum");
+    if (hum_item && cJSON_IsBool(hum_item)) {
+        ret = ezo_hum_set_output_parameter(sensor, "HUM", cJSON_IsTrue(hum_item));
+    }
+
+    if (ret == ESP_OK) {
+        cJSON *t_item = cJSON_GetObjectItem(payload, "t");
+        if (t_item && cJSON_IsBool(t_item)) {
+            ret = ezo_hum_set_output_parameter(sensor, "T", cJSON_IsTrue(t_item));
+        }
+    }
+
+    if (ret == ESP_OK) {
+        cJSON *dew_item = cJSON_GetObjectItem(payload, "dew");
+        if (dew_item && cJSON_IsBool(dew_item)) {
+            ret = ezo_hum_set_output_parameter(sensor, "Dew", cJSON_IsTrue(dew_item));
+        }
+    }
+
+    cJSON_Delete(payload);
+    free(raw);
+
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set output parameters");
+        return ESP_FAIL;
+    }
+
+    // Re-query sensor to get updated output parameter state
+    char param_response[EZO_LARGEST_STRING] = {0};
+    ret = ezo_sensor_send_command(sensor, "O,?", param_response, sizeof(param_response), EZO_SHORT_WAIT_MS);
+    if (ret == ESP_OK) {
+        sensor->config.hum.param_count = 0;
+        sensor->config.hum.param_hum = false;
+        sensor->config.hum.param_t = false;
+        sensor->config.hum.param_dew = false;
+        
+        char response_copy[EZO_LARGEST_STRING];
+        strncpy(response_copy, param_response, sizeof(response_copy) - 1);
+        response_copy[sizeof(response_copy) - 1] = '\0';
+        
+        char *param_token = strtok(response_copy, ",");
+        int param_field = 0;
+        
+        while (param_token != NULL && sensor->config.hum.param_count < 4) {
+            if (param_field > 0) {
+                strncpy(sensor->config.hum.param_order[sensor->config.hum.param_count], 
+                       param_token, sizeof(sensor->config.hum.param_order[0]) - 1);
+                
+                if (strcmp(param_token, "HUM") == 0) {
+                    sensor->config.hum.param_hum = true;
+                } else if (strcmp(param_token, "T") == 0) {
+                    sensor->config.hum.param_t = true;
+                } else if (strcmp(param_token, "Dew") == 0) {
+                    sensor->config.hum.param_dew = true;
+                }
+                
+                sensor->config.hum.param_count++;
+            }
+            param_token = strtok(NULL, ",");
+            param_field++;
+        }
+    }
+
+    esp_err_t resp = send_sensor_success_response(req, sensor);
+    sensor_read_guard_release(&guard);
+    return resp;
+}
+
+static esp_err_t api_sensor_memory_clear_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/memory-clear/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+
+    esp_err_t ret = ezo_sensor_memory_clear(sensor);
+    
+    if (ret != ESP_OK) {
+        sensor_read_guard_release(&guard);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory clear failed");
+        return ESP_FAIL;
+    }
+
     esp_err_t resp = send_sensor_success_response(req, sensor);
     sensor_read_guard_release(&guard);
     return resp;
@@ -2761,6 +2941,20 @@ static const httpd_uri_t api_sensor_ec_output_params_uri = {
     .uri = "/api/sensors/ec-output-params/*",
     .method = HTTP_POST,
     .handler = api_sensor_ec_output_params_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_hum_output_params_uri = {
+    .uri = "/api/sensors/hum-output-params/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_hum_output_params_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_memory_clear_uri = {
+    .uri = "/api/sensors/memory-clear/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_memory_clear_handler,
     .user_ctx = NULL
 };
 
@@ -3192,6 +3386,8 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_sensor_slope_uri);
     httpd_register_uri_handler(s_server, &api_sensor_ec_temp_comp_uri);
     httpd_register_uri_handler(s_server, &api_sensor_ec_output_params_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_hum_output_params_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_memory_clear_uri);
     // Register specific list endpoint before wildcard catch-alls so /list is handled correctly
     httpd_register_uri_handler(s_server, &api_webfiles_list_uri);
     httpd_register_uri_handler(s_server, &api_webfiles_reset_uri);

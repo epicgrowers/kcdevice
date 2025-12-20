@@ -606,6 +606,24 @@ esp_err_t ezo_ec_set_k_lock(ezo_sensor_t *sensor, bool locked);
  */
 esp_err_t ezo_ec_set_tds_lock(ezo_sensor_t *sensor, bool locked);
 
+/**
+ * @brief Set HUM sensor output parameters
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @param param Parameter name ("HUM", "T", "Dew")
+ * @param enabled true to enable, false to disable
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_hum_set_output_parameter(ezo_sensor_t *sensor, const char *param, bool enabled);
+
+/**
+ * @brief Clear sensor calibration data (safer than factory reset)
+ * 
+ * @param sensor Pointer to EZO sensor handle
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t ezo_sensor_memory_clear(ezo_sensor_t *sensor);
+
 #ifdef __cplusplus
 }
 #endif
