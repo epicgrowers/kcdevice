@@ -1329,14 +1329,10 @@ static esp_err_t api_device_name_set_handler(httpd_req_t *req)
 
 /**
  * @brief GET /api/sensors - Get list of all sensors with their configurations
+ * Returns cached configuration loaded at boot - no I2C polling
  */
 static esp_err_t api_sensors_list_handler(httpd_req_t *req)
 {
-    esp_err_t refresh_ret = sensor_manager_refresh_settings();
-    if (refresh_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Sensor settings refresh failed: %s", esp_err_to_name(refresh_ret));
-    }
-
     cJSON *root = cJSON_CreateObject();
     cJSON *sensors = cJSON_CreateArray();
     
@@ -1552,8 +1548,8 @@ static esp_err_t api_sensors_config_handler(httpd_req_t *req)
     
     cJSON_Delete(root);
     
-    // Refresh sensor settings after update
-    esp_err_t refresh_ret = ezo_sensor_refresh_settings(sensor);
+    // Refresh ALL sensor settings after update to sync cache with hardware
+    esp_err_t refresh_ret = sensor_manager_refresh_settings();
     if (refresh_ret != ESP_OK) {
         ESP_LOGW(TAG, "Failed to refresh sensor settings: %s", esp_err_to_name(refresh_ret));
     }
@@ -1782,6 +1778,12 @@ static esp_err_t api_sensors_config_batch_handler(httpd_req_t *req)
     free((void*)response_str);
     cJSON_Delete(response_root);
     cJSON_Delete(root);
+    
+    // Refresh ALL sensor settings after batch update to sync cache with hardware
+    esp_err_t refresh_ret = sensor_manager_refresh_settings();
+    if (refresh_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to refresh sensor settings after batch update: %s", esp_err_to_name(refresh_ret));
+    }
     
     // Resume sensor readings after batch update
     sensor_manager_resume_reading();
@@ -2607,23 +2609,14 @@ static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    char *raw = malloc(req->content_len + 1);
-    if (!raw) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    if (strcmp(sensor->config.type, EZO_TYPE_HUM) != 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Output parameters only available for HUM sensors");
         return ESP_FAIL;
     }
 
-    int ret_len = httpd_req_recv(req, raw, req->content_len);
-    if (ret_len <= 0) {
-        free(raw);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to read request body");
-        return ESP_FAIL;
-    }
-    raw[ret_len] = '\0';
-
-    cJSON *payload = cJSON_Parse(raw);
-    if (!payload) {
-        free(raw);
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
     }
@@ -2632,23 +2625,23 @@ static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
     sensor_read_guard_acquire(&guard);
 
     esp_err_t ret = ESP_OK;
-
-    cJSON *hum_item = cJSON_GetObjectItem(payload, "hum");
-    if (hum_item && cJSON_IsBool(hum_item)) {
-        ret = ezo_hum_set_output_parameter(sensor, "HUM", cJSON_IsTrue(hum_item));
+    
+    cJSON *hum = cJSON_GetObjectItem(payload, "hum");
+    if (hum != NULL && cJSON_IsBool(hum)) {
+        ret = ezo_hum_set_output_parameter(sensor, "HUM", cJSON_IsTrue(hum));
     }
-
+    
     if (ret == ESP_OK) {
-        cJSON *t_item = cJSON_GetObjectItem(payload, "t");
-        if (t_item && cJSON_IsBool(t_item)) {
-            ret = ezo_hum_set_output_parameter(sensor, "T", cJSON_IsTrue(t_item));
+        cJSON *t = cJSON_GetObjectItem(payload, "t");
+        if (t != NULL && cJSON_IsBool(t)) {
+            ret = ezo_hum_set_output_parameter(sensor, "T", cJSON_IsTrue(t));
         }
     }
-
+    
     if (ret == ESP_OK) {
-        cJSON *dew_item = cJSON_GetObjectItem(payload, "dew");
-        if (dew_item && cJSON_IsBool(dew_item)) {
-            ret = ezo_hum_set_output_parameter(sensor, "Dew", cJSON_IsTrue(dew_item));
+        cJSON *dew = cJSON_GetObjectItem(payload, "dew");
+        if (dew != NULL && cJSON_IsBool(dew)) {
+            ret = ezo_hum_set_output_parameter(sensor, "DEW", cJSON_IsTrue(dew));
         }
     }
 
@@ -2665,7 +2658,6 @@ static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
     char param_response[EZO_LARGEST_STRING] = {0};
     ret = ezo_sensor_send_command(sensor, "O,?", param_response, sizeof(param_response), EZO_SHORT_WAIT_MS);
     if (ret == ESP_OK) {
-        sensor->config.hum.param_count = 0;
         sensor->config.hum.param_hum = false;
         sensor->config.hum.param_t = false;
         sensor->config.hum.param_dew = false;
@@ -2677,20 +2669,15 @@ static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
         char *param_token = strtok(response_copy, ",");
         int param_field = 0;
         
-        while (param_token != NULL && sensor->config.hum.param_count < 4) {
+        while (param_token != NULL) {
             if (param_field > 0) {
-                strncpy(sensor->config.hum.param_order[sensor->config.hum.param_count], 
-                       param_token, sizeof(sensor->config.hum.param_order[0]) - 1);
-                
                 if (strcmp(param_token, "HUM") == 0) {
                     sensor->config.hum.param_hum = true;
                 } else if (strcmp(param_token, "T") == 0) {
                     sensor->config.hum.param_t = true;
-                } else if (strcmp(param_token, "Dew") == 0) {
+                } else if (strcmp(param_token, "DEW") == 0) {
                     sensor->config.hum.param_dew = true;
                 }
-                
-                sensor->config.hum.param_count++;
             }
             param_token = strtok(NULL, ",");
             param_field++;

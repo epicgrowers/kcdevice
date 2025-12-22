@@ -439,7 +439,7 @@ esp_err_t ezo_sensor_get_device_info(ezo_sensor_t *sensor) {
                         sensor->config.hum.param_hum = true;
                     } else if (strcmp(param_token, "T") == 0) {
                         sensor->config.hum.param_t = true;
-                    } else if (strcmp(param_token, "Dew") == 0) {
+                    } else if (strcmp(param_token, "DEW") == 0) {
                         sensor->config.hum.param_dew = true;
                     }
                     
