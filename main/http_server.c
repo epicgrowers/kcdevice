@@ -2595,6 +2595,80 @@ static esp_err_t api_sensor_ec_output_params_handler(httpd_req_t *req)
     return resp;
 }
 
+static esp_err_t api_sensor_manual_command_handler(httpd_req_t *req)
+{
+    uint8_t address;
+    if (!parse_sensor_address_from_uri(req->uri, "/api/sensors/command/", &address)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor address");
+        return ESP_FAIL;
+    }
+
+    ezo_sensor_t *sensor = find_sensor_by_address(address);
+    if (sensor == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Sensor not found");
+        return ESP_FAIL;
+    }
+
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    cJSON *cmd_item = cJSON_GetObjectItem(payload, "command");
+    if (!cmd_item || !cJSON_IsString(cmd_item)) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'command' string");
+        return ESP_FAIL;
+    }
+
+    const char *command = cJSON_GetStringValue(cmd_item);
+    if (!command || strlen(command) == 0) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty command");
+        return ESP_FAIL;
+    }
+
+    // Send command and get response
+    // Use long wait time for manual commands (especially R command needs time to measure)
+    char response[EZO_LARGEST_STRING] = {0};
+    sensor_read_guard_t guard;
+    sensor_read_guard_acquire(&guard);
+    esp_err_t ret = ezo_sensor_send_command(sensor, command, response, sizeof(response), EZO_LONG_WAIT_MS);
+    sensor_read_guard_release(&guard);
+
+    cJSON_Delete(payload);
+    free(raw);
+
+    // Build JSON response
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    cJSON_AddStringToObject(root, "status", ret == ESP_OK ? "success" : "error");
+    cJSON_AddStringToObject(root, "command", command);
+    cJSON_AddStringToObject(root, "response", ret == ESP_OK ? response : "Command failed");
+    cJSON_AddNumberToObject(root, "address", address);
+
+    const char *json_str = cJSON_PrintUnformatted(root);
+    if (json_str == NULL) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to serialize JSON");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_str);
+    free((void*)json_str);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t api_sensor_hum_output_params_handler(httpd_req_t *req)
 {
     uint8_t address;
@@ -2935,6 +3009,13 @@ static const httpd_uri_t api_sensor_hum_output_params_uri = {
     .uri = "/api/sensors/hum-output-params/*",
     .method = HTTP_POST,
     .handler = api_sensor_hum_output_params_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_sensor_manual_command_uri = {
+    .uri = "/api/sensors/command/*",
+    .method = HTTP_POST,
+    .handler = api_sensor_manual_command_handler,
     .user_ctx = NULL
 };
 
@@ -3374,6 +3455,7 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_sensor_ec_temp_comp_uri);
     httpd_register_uri_handler(s_server, &api_sensor_ec_output_params_uri);
     httpd_register_uri_handler(s_server, &api_sensor_hum_output_params_uri);
+    httpd_register_uri_handler(s_server, &api_sensor_manual_command_uri);
     httpd_register_uri_handler(s_server, &api_sensor_memory_clear_uri);
     // Register specific list endpoint before wildcard catch-alls so /list is handled correctly
     httpd_register_uri_handler(s_server, &api_webfiles_list_uri);
