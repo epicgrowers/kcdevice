@@ -2,6 +2,7 @@
 
 # Build artifacts
 build/
+build_*/
 sdkconfig
 sdkconfig.old
 *.bin
