@@ -755,6 +755,13 @@ async function sendManualModeCommand() {
     return;
   }
   
+  // Handle local 'clear' command
+  if (command.toLowerCase() === 'clear') {
+    input.value = '';
+    clearManualTerminal();
+    return;
+  }
+  
   appendToTerminal(command, 'command');
   input.value = '';
   
@@ -790,6 +797,7 @@ async function sendManualModeCommand() {
     if (data.selected_address !== undefined && data.status === 'success') {
       selectedSensorAddress = data.selected_address;
       appendToTerminal(`Sensor selected: Address ${selectedSensorAddress}`, 'info');
+      updateSelectedSensorStatus(data.sensor_type, data.selected_address);
     }
     
     appendToTerminal(response, data.status === 'error' ? 'error' : 'response');
@@ -827,6 +835,22 @@ function clearManualTerminal() {
   `;
   manualTerminalSession = [];
   selectedSensorAddress = null;  // Clear selected sensor
+  updateSelectedSensorStatus(null, null);  // Hide status indicator
+}
+
+function updateSelectedSensorStatus(sensorType, address) {
+  const statusDiv = document.getElementById('selectedSensorStatus');
+  const infoSpan = document.getElementById('selectedSensorInfo');
+  
+  if (!statusDiv || !infoSpan) return;
+  
+  if (address !== null && sensorType) {
+    statusDiv.style.display = 'block';
+    infoSpan.textContent = `EZO-${sensorType} @ Address ${address} (0x${address.toString(16).toUpperCase().padStart(2, '0')})`;
+  } else {
+    statusDiv.style.display = 'none';
+    infoSpan.textContent = 'No sensor selected';
+  }
 }
 
 // Clear session on window close

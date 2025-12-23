@@ -2766,19 +2766,34 @@ static esp_err_t api_manual_command_handler(httpd_req_t *req)
                             "  Cal,high,10.00 - Calibrate high point at pH 10.00\n"
                             "  Cal,?          - Query calibration status\n"
                             "  Cal,clear      - Clear calibration\n"
-                            "  Slope,?        - Query probe slope\n"
-                            "  T,<temp>       - Temperature compensation\n");
+                            "  Export,?       - Export calibration data (pg. 49)\n"
+                            "  Import,<data>  - Import calibration data (pg. 50)\n"
+                            "  Slope,?        - Query probe slope (pg. 51)\n"
+                            "  pHext,<0|1>    - Extended pH scale -1 to 15 (pg. 52)\n"
+                            "  pHext,?        - Query extended scale status\n"
+                            "  T,<temp>       - Temperature compensation (pg. 53)\n"
+                            "  T,?            - Query temp compensation\n");
                     } else if (strcmp(sensor->config.type, EZO_TYPE_EC) == 0) {
                         offset += snprintf(response_text + offset, sizeof(response_text) - offset,
                             "EC-Specific Commands:\n"
-                            "  Cal,dry        - Calibrate dry\n"
+                            "  Cal,dry        - Calibrate dry (pg. 49)\n"
                             "  Cal,low,12880  - Calibrate low point\n"
                             "  Cal,high,80000 - Calibrate high point\n"
                             "  Cal,?          - Query calibration status\n"
                             "  Cal,clear      - Clear calibration\n"
+                            "  Export,?       - Export calibration data (pg. 51)\n"
+                            "  Import,<data>  - Import calibration data (pg. 52)\n"
+                            "  K,<value>      - Set probe K value (pg. 53)\n"
                             "  K,?            - Query probe K value\n"
-                            "  K,<value>      - Set probe K value\n"
-                            "  T,<temp>       - Temperature compensation\n");
+                            "  O,EC,<0|1>     - Enable/disable EC output (pg. 55)\n"
+                            "  O,TDS,<0|1>    - Enable/disable TDS output\n"
+                            "  O,S,<0|1>      - Enable/disable salinity output\n"
+                            "  O,SG,<0|1>     - Enable/disable sp. gravity output\n"
+                            "  O,?            - Query output parameters\n"
+                            "  TDS,<value>    - Set TDS conversion factor (pg. 50)\n"
+                            "  TDS,?          - Query TDS conversion factor\n"
+                            "  T,<temp>       - Temperature compensation (pg. 54)\n"
+                            "  T,?            - Query temp compensation\n");
                     } else if (strcmp(sensor->config.type, EZO_TYPE_DO) == 0) {
                         offset += snprintf(response_text + offset, sizeof(response_text) - offset,
                             "DO-Specific Commands:\n"
@@ -2798,19 +2813,31 @@ static esp_err_t api_manual_command_handler(httpd_req_t *req)
                     } else if (strcmp(sensor->config.type, EZO_TYPE_RTD) == 0) {
                         offset += snprintf(response_text + offset, sizeof(response_text) - offset,
                             "RTD-Specific Commands:\n"
-                            "  Cal,<temp>     - Calibrate at known temperature\n"
+                            "  Cal,<temp>     - Calibrate at known temperature (pg. 45)\n"
                             "  Cal,?          - Query calibration status\n"
                             "  Cal,clear      - Clear calibration\n"
-                            "  S,c            - Set scale to Celsius\n"
+                            "  D,<0|1>        - Enable/disable data logger (pg. 49)\n"
+                            "  D,?            - Query data logger status\n"
+                            "  Export,?       - Export calibration data (pg. 46)\n"
+                            "  Import,<data>  - Import calibration data (pg. 47)\n"
+                            "  M              - Memory recall (pg. 50)\n"
+                            "  M,clear        - Clear memory\n"
+                            "  S,c            - Set scale to Celsius (pg. 48)\n"
                             "  S,k            - Set scale to Kelvin\n"
-                            "  S,f            - Set scale to Fahrenheit\n");
+                            "  S,f            - Set scale to Fahrenheit\n"
+                            "  S,?            - Query temperature scale\n");
                     } else if (strcmp(sensor->config.type, EZO_TYPE_HUM) == 0) {
                         offset += snprintf(response_text + offset, sizeof(response_text) - offset,
                             "HUM-Specific Commands:\n"
-                            "  Cal,<RH>       - Calibrate at known humidity\n"
-                            "  Cal,?          - Query calibration status\n"
-                            "  Cal,clear      - Clear calibration\n"
-                            "  T,<temp>       - Temperature for dew point calc\n");
+                            "  Tcal,<temp>    - Temperature calibration (pg. 44)\n"
+                            "  Tcal,?         - Query temp calibration status\n"
+                            "  Tcal,clear     - Clear temp calibration\n"
+                            "  O,HUM,<0|1>    - Enable/disable humidity output\n"
+                            "  O,T,<0|1>      - Enable/disable temp output\n"
+                            "  O,Dew,<0|1>    - Enable/disable dew point output\n"
+                            "  O,?            - Query output parameters (pg. 43)\n"
+                            "  Auto,<0|1>     - Enable/disable auto monitor (pg. 42)\n"
+                            "  Auto,?         - Query auto monitor status\n");
                     }
                     
                     offset += snprintf(response_text + offset, sizeof(response_text) - offset,
