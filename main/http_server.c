@@ -2595,6 +2595,373 @@ static esp_err_t api_sensor_ec_output_params_handler(httpd_req_t *req)
     return resp;
 }
 
+/**
+ * @brief Full-featured manual command console handler
+ * 
+ * Implements WhiteBox EZO Console-style command processing with:
+ * - !scan: Scan and list all I2C EZO devices
+ * - !help: Display help information
+ * - <address>: Select active sensor by I2C address (1-127)
+ * - <command>: Send command to active sensor
+ */
+static esp_err_t api_manual_command_handler(httpd_req_t *req)
+{
+    char *raw = NULL;
+    cJSON *payload = parse_request_json_body(req, &raw);
+    if (payload == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    cJSON *cmd_item = cJSON_GetObjectItem(payload, "command");
+    if (!cmd_item || !cJSON_IsString(cmd_item)) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'command' string");
+        return ESP_FAIL;
+    }
+
+    const char *command = cJSON_GetStringValue(cmd_item);
+    if (!command) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty command");
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        cJSON_Delete(payload);
+        free(raw);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    char response_text[1024] = {0};
+    
+    // Handle console commands starting with '!'
+    if (command[0] == '!') {
+        if (strcmp(command, "!help") == 0) {
+            snprintf(response_text, sizeof(response_text),
+                "KannaCloud EZO Console - Available Commands:\n"
+                "  !help       - Show this help message\n"
+                "  !scan       - Scan and list all EZO sensors on I2C bus\n"
+                "  !cmd        - Show commands for selected sensor\n"
+                "  <address>   - Select sensor by I2C address (e.g., 99)\n"
+                "  <command>   - Send command to active sensor (e.g., R, I, Status)\n"
+                "\n"
+                "Examples:\n"
+                "  !scan                  - Find all sensors\n"
+                "  99                     - Select sensor at address 99\n"
+                "  I                      - Get device info\n"
+                "  R                      - Read sensor value\n"
+                "  Cal,mid,7.00          - Calibrate pH mid-point\n"
+                "  T,25.5                 - Set temperature compensation\n"
+                "\n"
+                "Note: Sensor must be selected before sending commands.");
+            
+            cJSON_AddStringToObject(root, "status", "success");
+            cJSON_AddStringToObject(root, "command", command);
+            cJSON_AddStringToObject(root, "response", response_text);
+        }
+        else if (strcmp(command, "!scan") == 0) {
+            // Scan I2C bus and list all EZO sensors
+            uint8_t sensor_count = sensor_manager_get_ezo_count();
+            
+            if (sensor_count == 0) {
+                snprintf(response_text, sizeof(response_text),
+                    "I2C Bus Scan Complete\n"
+                    "---\n"
+                    "No EZO sensors found.\n"
+                    "---\n"
+                    "Make sure sensors are:\n"
+                    "  1. Properly powered\n"
+                    "  2. Connected to I2C bus\n"
+                    "  3. In I2C mode (not UART)\n"
+                    "  4. Using unique addresses");
+            } else {
+                int offset = snprintf(response_text, sizeof(response_text),
+                    "I2C Bus Scan Complete\n"
+                    "---\n"
+                    "%d EZO sensor(s) found:\n\n", sensor_count);
+                
+                for (uint8_t i = 0; i < sensor_count && offset < sizeof(response_text) - 100; i++) {
+                    ezo_sensor_t *sensor = (ezo_sensor_t*)sensor_manager_get_ezo_sensor(i);
+                    if (sensor != NULL) {
+                        const char *type_name = sensor->config.type;
+                        if (strcmp(type_name, EZO_TYPE_PH) == 0) type_name = "pH";
+                        else if (strcmp(type_name, EZO_TYPE_EC) == 0) type_name = "Conductivity (EC)";
+                        else if (strcmp(type_name, EZO_TYPE_DO) == 0) type_name = "Dissolved Oxygen (DO)";
+                        else if (strcmp(type_name, EZO_TYPE_ORP) == 0) type_name = "ORP";
+                        else if (strcmp(type_name, EZO_TYPE_RTD) == 0) type_name = "Temperature (RTD)";
+                        else if (strcmp(type_name, EZO_TYPE_HUM) == 0) type_name = "Humidity (HUM)";
+                        
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "  [%d] Address: 0x%02X (%d)\n"
+                            "      Type: EZO-%s\n"
+                            "      Firmware: %s\n"
+                            "      Name: %s\n\n",
+                            i + 1,
+                            sensor->config.i2c_address,
+                            sensor->config.i2c_address,
+                            sensor->config.type,
+                            sensor->config.firmware_version[0] ? sensor->config.firmware_version : "Unknown",
+                            sensor->config.name[0] ? sensor->config.name : "(unnamed)");
+                    }
+                }
+                
+                offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                    "---\n"
+                    "To use a sensor, type its address (e.g., '%d')", 
+                    ((ezo_sensor_t*)sensor_manager_get_ezo_sensor(0))->config.i2c_address);
+            }
+            
+            cJSON_AddStringToObject(root, "status", "success");
+            cJSON_AddStringToObject(root, "command", command);
+            cJSON_AddStringToObject(root, "response", response_text);
+        }
+        else if (strcmp(command, "!cmd") == 0) {
+            // Show commands for selected sensor
+            cJSON *addr_item = cJSON_GetObjectItem(payload, "address");
+            uint8_t target_address = 0;
+            
+            if (addr_item && cJSON_IsNumber(addr_item)) {
+                target_address = (uint8_t)cJSON_GetNumberValue(addr_item);
+            }
+            
+            if (target_address == 0) {
+                snprintf(response_text, sizeof(response_text),
+                    "Error: No sensor selected\n"
+                    "---\n"
+                    "Please select a sensor first by typing its address.\n"
+                    "Example: Type '99' to select sensor at address 99");
+                cJSON_AddStringToObject(root, "status", "error");
+            } else {
+                ezo_sensor_t *sensor = find_sensor_by_address(target_address);
+                if (sensor == NULL) {
+                    snprintf(response_text, sizeof(response_text),
+                        "Error: No sensor at address %d", target_address);
+                    cJSON_AddStringToObject(root, "status", "error");
+                } else {
+                    // Build sensor-specific command list
+                    int offset = snprintf(response_text, sizeof(response_text),
+                        "EZO-%s Commands (Address %d)\n"
+                        "---\n"
+                        "Common Commands:\n"
+                        "  R              - Read sensor value\n"
+                        "  I              - Device information\n"
+                        "  Status         - Device status\n"
+                        "  Factory        - Factory reset\n"
+                        "  Sleep          - Enter low power mode\n"
+                        "  Name,<name>    - Set device name\n"
+                        "  Name,?         - Query device name\n\n",
+                        sensor->config.type, target_address);
+                    
+                    // Add sensor-specific commands
+                    if (strcmp(sensor->config.type, EZO_TYPE_PH) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "pH-Specific Commands:\n"
+                            "  Cal,mid,7.00   - Calibrate midpoint at pH 7.00\n"
+                            "  Cal,low,4.00   - Calibrate low point at pH 4.00\n"
+                            "  Cal,high,10.00 - Calibrate high point at pH 10.00\n"
+                            "  Cal,?          - Query calibration status\n"
+                            "  Cal,clear      - Clear calibration\n"
+                            "  Slope,?        - Query probe slope\n"
+                            "  T,<temp>       - Temperature compensation\n");
+                    } else if (strcmp(sensor->config.type, EZO_TYPE_EC) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "EC-Specific Commands:\n"
+                            "  Cal,dry        - Calibrate dry\n"
+                            "  Cal,low,12880  - Calibrate low point\n"
+                            "  Cal,high,80000 - Calibrate high point\n"
+                            "  Cal,?          - Query calibration status\n"
+                            "  Cal,clear      - Clear calibration\n"
+                            "  K,?            - Query probe K value\n"
+                            "  K,<value>      - Set probe K value\n"
+                            "  T,<temp>       - Temperature compensation\n");
+                    } else if (strcmp(sensor->config.type, EZO_TYPE_DO) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "DO-Specific Commands:\n"
+                            "  Cal              - Calibrate at atmospheric O2\n"
+                            "  Cal,0            - Calibrate at zero dissolved O2\n"
+                            "  Cal,?            - Query calibration status\n"
+                            "  Cal,clear        - Clear calibration\n"
+                            "  T,<temp>         - Temperature compensation\n"
+                            "  S,<salinity>     - Salinity compensation (ppt)\n"
+                            "  P,<pressure>     - Pressure compensation (kPa)\n");
+                    } else if (strcmp(sensor->config.type, EZO_TYPE_ORP) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "ORP-Specific Commands:\n"
+                            "  Cal,<mV>       - Calibrate at specific mV value\n"
+                            "  Cal,?          - Query calibration status\n"
+                            "  Cal,clear      - Clear calibration\n");
+                    } else if (strcmp(sensor->config.type, EZO_TYPE_RTD) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "RTD-Specific Commands:\n"
+                            "  Cal,<temp>     - Calibrate at known temperature\n"
+                            "  Cal,?          - Query calibration status\n"
+                            "  Cal,clear      - Clear calibration\n"
+                            "  S,c            - Set scale to Celsius\n"
+                            "  S,k            - Set scale to Kelvin\n"
+                            "  S,f            - Set scale to Fahrenheit\n");
+                    } else if (strcmp(sensor->config.type, EZO_TYPE_HUM) == 0) {
+                        offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                            "HUM-Specific Commands:\n"
+                            "  Cal,<RH>       - Calibrate at known humidity\n"
+                            "  Cal,?          - Query calibration status\n"
+                            "  Cal,clear      - Clear calibration\n"
+                            "  T,<temp>       - Temperature for dew point calc\n");
+                    }
+                    
+                    offset += snprintf(response_text + offset, sizeof(response_text) - offset,
+                        "\n---\n"
+                        "💡 Tip: Commands are case-insensitive");
+                    
+                    cJSON_AddStringToObject(root, "status", "success");
+                }
+            }
+            cJSON_AddStringToObject(root, "command", command);
+            cJSON_AddStringToObject(root, "response", response_text);
+        }
+        else {
+            snprintf(response_text, sizeof(response_text),
+                "Unknown console command: %s\n"
+                "Type '!help' for available commands.", command);
+            cJSON_AddStringToObject(root, "status", "error");
+            cJSON_AddStringToObject(root, "command", command);
+            cJSON_AddStringToObject(root, "response", response_text);
+        }
+    }
+    // Check if command is an I2C address (1-127)
+    else {
+        char *endptr = NULL;
+        long addr = strtol(command, &endptr, 10);
+        
+        // If entire string is a valid number between 1-127, treat as address selection
+        if (endptr != command && *endptr == '\0' && addr >= 1 && addr <= 127) {
+            ezo_sensor_t *sensor = find_sensor_by_address((uint8_t)addr);
+            if (sensor != NULL) {
+                snprintf(response_text, sizeof(response_text),
+                    "Connected to sensor at address %d (0x%02X)\n"
+                    "---\n"
+                    "Type: EZO-%s\n"
+                    "Firmware: %s\n"
+                    "Name: %s\n"
+                    "---\n"
+                    "You can now send commands directly (e.g., 'R' to read, 'I' for info)\n"
+                    "💡 Tip: Type '!cmd' to see all available commands for this sensor\n"
+                    "For calibration, refer to the EZO-%s datasheet",
+                    (int)addr, (int)addr,
+                    sensor->config.type,
+                    sensor->config.firmware_version[0] ? sensor->config.firmware_version : "Unknown",
+                    sensor->config.name[0] ? sensor->config.name : "(unnamed)",
+                    sensor->config.type);
+                
+                cJSON_AddStringToObject(root, "status", "success");
+                cJSON_AddStringToObject(root, "command", command);
+                cJSON_AddStringToObject(root, "response", response_text);
+                cJSON_AddNumberToObject(root, "selected_address", addr);
+                cJSON_AddStringToObject(root, "sensor_type", sensor->config.type);
+            } else {
+                snprintf(response_text, sizeof(response_text),
+                    "No sensor found at address %d (0x%02X)\n"
+                    "---\n"
+                    "Type '!scan' to see available sensors", (int)addr, (int)addr);
+                cJSON_AddStringToObject(root, "status", "error");
+                cJSON_AddStringToObject(root, "command", command);
+                cJSON_AddStringToObject(root, "response", response_text);
+            }
+        }
+        // Otherwise, treat as EZO command (needs address in context)
+        else {
+            // For direct commands, we need to know which sensor to send to
+            // Check if "address" field is provided in JSON
+            cJSON *addr_item = cJSON_GetObjectItem(payload, "address");
+            uint8_t target_address = 0;
+            
+            if (addr_item && cJSON_IsNumber(addr_item)) {
+                target_address = (uint8_t)cJSON_GetNumberValue(addr_item);
+            }
+            
+            if (target_address == 0) {
+                snprintf(response_text, sizeof(response_text),
+                    "Error: No sensor selected\n"
+                    "---\n"
+                    "Please select a sensor first by typing its address,\n"
+                    "or include 'address' field in JSON request.\n\n"
+                    "Example: Type '99' to select sensor at address 99\n"
+                    "Then send commands like 'R', 'I', etc.");
+                cJSON_AddStringToObject(root, "status", "error");
+                cJSON_AddStringToObject(root, "command", command);
+                cJSON_AddStringToObject(root, "response", response_text);
+            } else {
+                ezo_sensor_t *sensor = find_sensor_by_address(target_address);
+                if (sensor == NULL) {
+                    snprintf(response_text, sizeof(response_text),
+                        "Error: No sensor at address %d", target_address);
+                    cJSON_AddStringToObject(root, "status", "error");
+                    cJSON_AddStringToObject(root, "command", command);
+                    cJSON_AddStringToObject(root, "response", response_text);
+                } else {
+                    // Send command to sensor
+                    char ezo_response[EZO_LARGEST_STRING] = {0};
+                    sensor_read_guard_t guard;
+                    sensor_read_guard_acquire(&guard);
+                    
+                    // Use appropriate wait time based on command
+                    uint32_t wait_ms = EZO_LONG_WAIT_MS;
+                    if (command[0] == 'R' || command[0] == 'r' ||
+                        strncmp(command, "Cal", 3) == 0 || strncmp(command, "cal", 3) == 0) {
+                        wait_ms = EZO_LONG_WAIT_MS;  // 1000ms for readings and calibrations
+                    } else {
+                        wait_ms = 300;  // 300ms for other commands
+                    }
+                    
+                    esp_err_t ret = ezo_sensor_send_command(sensor, command, ezo_response, 
+                                                           sizeof(ezo_response), wait_ms);
+                    sensor_read_guard_release(&guard);
+                    
+                    if (ret == ESP_OK) {
+                        snprintf(response_text, sizeof(response_text),
+                            "[%d] %s > %s\n< %s",
+                            target_address, sensor->config.type, command,
+                            ezo_response[0] ? ezo_response : "(no response)");
+                        cJSON_AddStringToObject(root, "status", "success");
+                        cJSON_AddStringToObject(root, "command", command);
+                        cJSON_AddStringToObject(root, "response", response_text);
+                        cJSON_AddNumberToObject(root, "address", target_address);
+                        cJSON_AddStringToObject(root, "raw_response", ezo_response);
+                    } else {
+                        snprintf(response_text, sizeof(response_text),
+                            "[%d] %s > %s\n< ERROR: Command failed",
+                            target_address, sensor->config.type, command);
+                        cJSON_AddStringToObject(root, "status", "error");
+                        cJSON_AddStringToObject(root, "command", command);
+                        cJSON_AddStringToObject(root, "response", response_text);
+                        cJSON_AddNumberToObject(root, "address", target_address);
+                    }
+                }
+            }
+        }
+    }
+
+    cJSON_Delete(payload);
+    free(raw);
+
+    const char *json_str = cJSON_PrintUnformatted(root);
+    if (json_str == NULL) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to serialize JSON");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_str);
+    free((void*)json_str);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t api_sensor_manual_command_handler(httpd_req_t *req)
 {
     uint8_t address;
@@ -3016,6 +3383,13 @@ static const httpd_uri_t api_sensor_manual_command_uri = {
     .uri = "/api/sensors/command/*",
     .method = HTTP_POST,
     .handler = api_sensor_manual_command_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_manual_command_uri = {
+    .uri = "/api/manual-command",
+    .method = HTTP_POST,
+    .handler = api_manual_command_handler,
     .user_ctx = NULL
 };
 
@@ -3457,6 +3831,7 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_sensor_hum_output_params_uri);
     httpd_register_uri_handler(s_server, &api_sensor_manual_command_uri);
     httpd_register_uri_handler(s_server, &api_sensor_memory_clear_uri);
+    httpd_register_uri_handler(s_server, &api_manual_command_uri);  // Console-style manual command endpoint
     // Register specific list endpoint before wildcard catch-alls so /list is handled correctly
     httpd_register_uri_handler(s_server, &api_webfiles_list_uri);
     httpd_register_uri_handler(s_server, &api_webfiles_reset_uri);

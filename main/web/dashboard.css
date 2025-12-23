@@ -146,3 +146,33 @@
   font-weight: 600;
   border: 2px solid #3b82f6;
 }
+
+/* Manual Mode Terminal Styles */
+#manualTerminal {
+  scrollbar-width: thin;
+  scrollbar-color: #4ade80 #000;
+  white-space: pre-wrap;
+}
+
+#manualTerminal::-webkit-scrollbar {
+  width: 8px;
+}
+
+#manualTerminal::-webkit-scrollbar-track {
+  background: #000;
+}
+
+#manualTerminal::-webkit-scrollbar-thumb {
+  background: #4ade80;
+  border-radius: 4px;
+}
+
+#manualTerminal::-webkit-scrollbar-thumb:hover {
+  background: #22c55e;
+}
+
+#manualTerminal > div {
+  padding: 2px 0;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}

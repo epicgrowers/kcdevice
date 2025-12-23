@@ -88,6 +88,7 @@
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(1)'>🔬 Sensors</button>
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(2)'>⚙️ Settings</button>
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(3)'>🔧 Actions</button>
+<button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(4)'>💻 Manual Mode</button>
 </div>
 
 <div class='tab-content active' id='tab-0'>
@@ -207,6 +208,58 @@ class='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md b
 <i class='fas fa-trash'></i> Clear WiFi & Reset
 </button>
 </div>
+</div>
+
+<div class='tab-content' id='tab-4' style='display:none'>
+<h2 class='text-xl font-bold text-gray-900 dark:text-white mb-4'>💻 Manual Command Mode</h2>
+<p class='text-sm text-gray-600 dark:text-gray-400 mb-4'>Send commands directly to your device and view the responses in real-time. Session history is maintained until you close or refresh this window.</p>
+
+<!-- Terminal Display -->
+<div id='manualTerminal' class='bg-black text-green-400 font-mono text-sm p-4 rounded-lg h-96 overflow-y-auto mb-4 border-2 border-gray-600'>
+<div class='text-gray-500'>════════════════════════════════════════════════════════</div>
+<div class='text-green-400 font-bold'>  KannaCloud EZO Console - Manual Command Mode</div>
+<div class='text-gray-500'>════════════════════════════════════════════════════════</div>
+<div class='text-gray-400 mt-2'>Welcome! Use this console to interact with your EZO sensors.</div>
+<div class='text-gray-400'>Type commands below and press Enter or click Send.</div>
+<div class='text-gray-500 mt-2'>───────────────────────────────────────────────────────</div>
+<div class='text-cyan-400 mt-2'>Quick Start Commands:</div>
+<div class='text-white'>  !help      <span class='text-gray-500'>- Show all available commands</span></div>
+<div class='text-white'>  !scan      <span class='text-gray-500'>- Find all connected sensors</span></div>
+<div class='text-white'>  &lt;address&gt;  <span class='text-gray-500'>- Select sensor (e.g., 99, 100, 101)</span></div>
+<div class='text-white'>  R          <span class='text-gray-500'>- Read current sensor value</span></div>
+<div class='text-white'>  I          <span class='text-gray-500'>- Get sensor information</span></div>
+<div class='text-gray-500 mt-2'>───────────────────────────────────────────────────────</div>
+<div class='text-yellow-400 mt-2'>💡 Tip: Start with "!scan" to discover your sensors</div>
+<div class='text-gray-500 mt-1'>════════════════════════════════════════════════════════</div>
+</div>
+
+<!-- Command Input -->
+<div class='flex gap-2'>
+<input 
+id='manualModeInput' 
+type='text' 
+placeholder='Enter command here...' 
+class='flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono focus:border-green-500 focus:outline-none'
+onkeypress='if(event.key==="Enter")sendManualModeCommand()'
+>
+<button 
+onclick='sendManualModeCommand()' 
+class='px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors'>
+<i class='fas fa-paper-plane mr-2'></i>Send
+</button>
+<button 
+onclick='clearManualTerminal()' 
+class='px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors'>
+<i class='fas fa-trash mr-2'></i>Clear
+</button>
+</div>
+
+<div class='mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 text-blue-800 dark:text-blue-200'>
+<p class='font-semibold'><i class='fas fa-info-circle'></i> Tips:</p>
+<p class='text-sm mt-1'>• Commands are sent to the device for processing</p>
+<p class='text-sm'>• Previous commands and responses are saved in this session</p>
+<p class='text-sm'>• Use the Clear button to reset the terminal display</p>
+<p class='text-sm'>• Closing or refreshing this page will clear the session history</p>
 </div>
 </div>
 

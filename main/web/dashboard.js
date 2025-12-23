@@ -106,7 +106,20 @@ async function calibrateDoSensor(address,point){const addrHex=formatAddress(addr
 async function setPhTempComp(address){const input=document.getElementById(`ph-temp-${address}`);const value=parseFloat(input?.value||'');if(Number.isNaN(value)){alert('Enter a valid temperature value.');return;}await sensorActionRequest(`/api/sensors/compensate/${address}`,{temp_c:value},'Compensation temperature updated.');}
 async function setSensorSleep(address,sleep){const addrHex=formatAddress(address);const action=sleep?'put to sleep':'wake';if(!confirm(`Do you want to ${action} sensor 0x${addrHex}?`))return;await sensorActionRequest(`/api/sensors/power/${address}`,{sleep:!!sleep},sleep?'Sleep command sent.':'Wake command sent.');}
 async function sendManualCommand(address){const input=document.getElementById(`manual-cmd-${address}`);const responseDiv=document.getElementById(`manual-response-${address}`);const command=(input?.value||'').trim();if(!command){alert('Enter a command');return;}responseDiv.style.display='block';responseDiv.textContent='Sending...';try{const res=await fetch(`/api/sensors/command/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})});if(!res.ok){const err=await res.text();throw new Error(err||'Command failed');}const data=await res.json();const timestamp=new Date().toLocaleTimeString();responseDiv.textContent=`[${timestamp}] > ${data.command}\n< ${data.response||'(no response)'}`;input.value='';}catch(e){responseDiv.textContent=`Error: ${e.message}`;console.error('Manual command failed:',e);}}
-async function showTab(n){const previousTab=currentTab;currentTab=n;if(previousTab===1&&n!==1){await resumeSensors(true);}if(n===1&&previousTab!==1){await pauseSensors(true);}document.querySelectorAll('.tab').forEach((t,i)=>{if(i===n){t.className='px-6 py-3 text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 font-semibold tab active';}else{t.className='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab';}});document.querySelectorAll('.tab-content').forEach((c,i)=>{c.style.display=(i===n)?'block':'none';});if(n===1)loadSensors();if(n===2){loadSettings();loadDeviceInfo();}}
+async function showTab(n){const previousTab=currentTab;currentTab=n;
+// Tabs that require sensors to be paused
+const pauseRequiredTabs=[1,4]; // Tab 1: Sensors, Tab 4: Manual Mode
+const wasPauseRequired=pauseRequiredTabs.includes(previousTab);
+const isPauseRequired=pauseRequiredTabs.includes(n);
+
+// Only toggle sensor state if the pause requirement changed
+if(wasPauseRequired&&!isPauseRequired){
+  await resumeSensors(true);
+} else if(!wasPauseRequired&&isPauseRequired){
+  await pauseSensors(true);
+}
+
+document.querySelectorAll('.tab').forEach((t,i)=>{if(i===n){t.className='px-6 py-3 text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 font-semibold tab active';}else{t.className='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab';}});document.querySelectorAll('.tab-content').forEach((c,i)=>{c.style.display=(i===n)?'block':'none';});if(n===1)loadSensors();if(n===2){loadSettings();loadDeviceInfo();}}
 async function loadDeviceInfo(){try{const res=await fetch('/api/device/info');if(!res.ok)throw new Error('Failed to load device info');const data=await res.json();document.getElementById('device-id').value=data.device_id||'';document.getElementById('device-name').value=data.device_name||'';}catch(e){console.error('Failed to load device info:',e);}}
 async function saveDeviceName(){try{const deviceName=document.getElementById('device-name').value.trim();if(deviceName&&deviceName.length>64){alert('Device name must be 64 characters or less');return;}const res=await fetch('/api/device/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_name:deviceName})});if(!res.ok){const text=await res.text();throw new Error(text||'Failed to save device name');}const data=await res.json();document.getElementById('device-name').value=data.device_name||'';alert('Device name saved successfully!');}catch(e){console.error('Failed to save device name:',e);alert('Error: '+e.message);}}
 async function clearDeviceName(){try{const res=await fetch('/api/device/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_name:''})});if(!res.ok)throw new Error('Failed to clear device name');document.getElementById('device-name').value='';alert('Device name cleared!');}catch(e){console.error('Failed to clear device name:',e);alert('Error: '+e.message);}}
@@ -694,5 +707,132 @@ async function updateEcOutputParams(address){const ec=document.getElementById(`p
 async function updateHumOutputParams(address){const hum=document.getElementById(`param-hum-${address}`)?.checked||false;const t=document.getElementById(`param-t-${address}`)?.checked||false;const dew=document.getElementById(`param-dew-${address}`)?.checked||false;try{const res=await fetch(`/api/sensors/hum-output-params/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hum,t,dew})});if(!res.ok)throw new Error('Failed to update output parameters');alert('✓ HUM output parameters updated');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
 
 async function memoryClear(address){if(!confirm(`Clear calibration data for sensor 0x${formatAddress(address)}?\n\nThis will erase calibration without resetting other settings (safer than factory reset).`))return;try{const res=await fetch(`/api/sensors/memory-clear/${address}`,{method:'POST'});if(!res.ok)throw new Error('Memory clear failed');alert('✓ Calibration data cleared');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
+
+// Manual Mode Terminal Session Management
+let manualTerminalSession = [];
+let selectedSensorAddress = null;  // Track currently selected sensor
+
+function appendToTerminal(text, type = 'output') {
+  const terminal = document.getElementById('manualTerminal');
+  if (!terminal) return;
+  
+  const timestamp = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  
+  if (type === 'command') {
+    line.className = 'text-white mt-2';
+    line.style.whiteSpace = 'pre-wrap';
+    line.textContent = `[${timestamp}] > ${text}`;
+  } else if (type === 'response') {
+    line.className = 'text-green-400';
+    line.style.whiteSpace = 'pre-wrap';
+    line.textContent = `< ${text}`;
+  } else if (type === 'error') {
+    line.className = 'text-red-400';
+    line.style.whiteSpace = 'pre-wrap';
+    line.textContent = `ERROR: ${text}`;
+  } else if (type === 'info') {
+    line.className = 'text-cyan-400';
+    line.style.whiteSpace = 'pre-wrap';
+    line.textContent = `ℹ ${text}`;
+  } else {
+    line.className = 'text-gray-400';
+    line.style.whiteSpace = 'pre-wrap';
+    line.textContent = text;
+  }
+  
+  terminal.appendChild(line);
+  manualTerminalSession.push({ timestamp, text, type });
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+async function sendManualModeCommand() {
+  const input = document.getElementById('manualModeInput');
+  const command = (input?.value || '').trim();
+  
+  if (!command) {
+    appendToTerminal('Please enter a command', 'error');
+    return;
+  }
+  
+  appendToTerminal(command, 'command');
+  input.value = '';
+  
+  try {
+    // Build request payload
+    const payload = { command };
+    
+    // Add selected address for commands that need it
+    // - Regular commands (not starting with !)
+    // - !cmd command (needs to know which sensor)
+    if (!command.startsWith('!') || command === '!cmd') {
+      const isNumber = /^\d+$/.test(command);
+      if (!isNumber && selectedSensorAddress !== null) {
+        payload.address = selectedSensorAddress;
+      }
+    }
+    
+    const res = await fetch('/api/manual-command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || 'Command failed');
+    }
+    
+    const data = await res.json();
+    const response = data.response || data.result || 'Command executed successfully';
+    
+    // Check if this was a successful sensor selection
+    if (data.selected_address !== undefined && data.status === 'success') {
+      selectedSensorAddress = data.selected_address;
+      appendToTerminal(`Sensor selected: Address ${selectedSensorAddress}`, 'info');
+    }
+    
+    appendToTerminal(response, data.status === 'error' ? 'error' : 'response');
+  } catch (e) {
+    appendToTerminal(e.message, 'error');
+    console.error('Manual command failed:', e);
+  }
+}
+
+function clearManualTerminal() {
+  const terminal = document.getElementById('manualTerminal');
+  if (!terminal) return;
+  
+  if (manualTerminalSession.length > 3 && !confirm('Clear the terminal session history?')) {
+    return;
+  }
+  
+  terminal.innerHTML = `
+    <div class='text-gray-500'>════════════════════════════════════════════════════════</div>
+    <div class='text-green-400 font-bold'>  KannaCloud EZO Console - Manual Command Mode</div>
+    <div class='text-gray-500'>════════════════════════════════════════════════════════</div>
+    <div class='text-gray-400 mt-2'>Welcome! Use this console to interact with your EZO sensors.</div>
+    <div class='text-gray-400'>Type commands below and press Enter or click Send.</div>
+    <div class='text-gray-500 mt-2'>───────────────────────────────────────────────────────</div>
+    <div class='text-cyan-400 mt-2'>Quick Start Commands:</div>
+    <div class='text-white'>  !help      <span class='text-gray-500'>- Show all available commands</span></div>
+    <div class='text-white'>  !scan      <span class='text-gray-500'>- Find all connected sensors</span></div>
+    <div class='text-white'>  &lt;address&gt;  <span class='text-gray-500'>- Select sensor (e.g., 99, 100, 101)</span></div>
+    <div class='text-white'>  !cmd       <span class='text-gray-500'>- Show commands for selected sensor</span></div>
+    <div class='text-white'>  R          <span class='text-gray-500'>- Read current sensor value</span></div>
+    <div class='text-white'>  I          <span class='text-gray-500'>- Get sensor information</span></div>
+    <div class='text-gray-500 mt-2'>───────────────────────────────────────────────────────</div>
+    <div class='text-yellow-400 mt-2'>💡 Tip: Start with "!scan" to discover your sensors</div>
+    <div class='text-gray-500 mt-1'>════════════════════════════════════════════════════════</div>
+  `;
+  manualTerminalSession = [];
+  selectedSensorAddress = null;  // Clear selected sensor
+}
+
+// Clear session on window close
+window.addEventListener('beforeunload', () => {
+  manualTerminalSession = [];
+  selectedSensorAddress = null;
+});
 
 window.onload=()=>{initializeDashboard();};
