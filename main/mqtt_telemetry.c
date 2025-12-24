@@ -233,21 +233,53 @@ static void mqtt_publish_task(void *arg)
             if (!sensor->valid) continue;
             
             if (sensor->value_count == 1) {
-                cJSON_AddNumberToObject(sensors, sensor->sensor_type, sensor->values[0]);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[0] * 100) / 100);
+                cJSON_AddRawToObject(sensors, sensor->sensor_type, buf);
             } else if (sensor->value_count > 1) {
                 cJSON *sensor_obj = cJSON_CreateObject();
                 if (strcmp(sensor->sensor_type, "HUM") == 0) {
-                    if (sensor->value_count >= 1) cJSON_AddNumberToObject(sensor_obj, "humidity", sensor->values[0]);
-                    if (sensor->value_count >= 2) cJSON_AddNumberToObject(sensor_obj, "air_temp", sensor->values[1]);
-                    if (sensor->value_count >= 3) cJSON_AddNumberToObject(sensor_obj, "dew_point", sensor->values[2]);
+                    char buf[32];
+                    if (sensor->value_count >= 1) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[0] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "humidity", buf);
+                    }
+                    if (sensor->value_count >= 2) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[1] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "air_temp", buf);
+                    }
+                    if (sensor->value_count >= 3) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[2] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "dew_point", buf);
+                    }
                 } else if (strcmp(sensor->sensor_type, "EC") == 0) {
-                    if (sensor->value_count >= 1) cJSON_AddNumberToObject(sensor_obj, "conductivity", sensor->values[0]);
-                    if (sensor->value_count >= 2) cJSON_AddNumberToObject(sensor_obj, "tds", sensor->values[1]);
-                    if (sensor->value_count >= 3) cJSON_AddNumberToObject(sensor_obj, "salinity", sensor->values[2]);
-                    if (sensor->value_count >= 4) cJSON_AddNumberToObject(sensor_obj, "specific_gravity", sensor->values[3]);
+                    char buf[32];
+                    if (sensor->value_count >= 1) {
+                        snprintf(buf, sizeof(buf), "%.0f", floor(sensor->values[0]));
+                        cJSON_AddRawToObject(sensor_obj, "conductivity", buf);
+                    }
+                    if (sensor->value_count >= 2) {
+                        snprintf(buf, sizeof(buf), "%.0f", floor(sensor->values[1]));
+                        cJSON_AddRawToObject(sensor_obj, "tds", buf);
+                    }
+                    if (sensor->value_count >= 3) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[2] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "salinity", buf);
+                    }
+                    if (sensor->value_count >= 4) {
+                        snprintf(buf, sizeof(buf), "%.3f", floor(sensor->values[3] * 1000) / 1000);
+                        cJSON_AddRawToObject(sensor_obj, "specific_gravity", buf);
+                    }
                 } else if (strcmp(sensor->sensor_type, "DO") == 0) {
-                    if (sensor->value_count >= 1) cJSON_AddNumberToObject(sensor_obj, "dissolved_oxygen", sensor->values[0]);
-                    if (sensor->value_count >= 2) cJSON_AddNumberToObject(sensor_obj, "saturation", sensor->values[1]);
+                    char buf[32];
+                    if (sensor->value_count >= 1) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[0] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "dissolved_oxygen", buf);
+                    }
+                    if (sensor->value_count >= 2) {
+                        snprintf(buf, sizeof(buf), "%.2f", floor(sensor->values[1] * 100) / 100);
+                        cJSON_AddRawToObject(sensor_obj, "saturation", buf);
+                    }
                 }
                 cJSON_AddItemToObject(sensors, sensor->sensor_type, sensor_obj);
             }
