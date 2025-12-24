@@ -3788,7 +3788,7 @@ esp_err_t http_server_start(void)
     
     // Configure HTTPS server
     httpd_ssl_config_t config = HTTPD_SSL_CONFIG_DEFAULT();
-    config.httpd.max_uri_handlers = 40;  // Increased for web file editor + sensor action endpoints + new diagnostic endpoints
+    config.httpd.max_uri_handlers = 50;  // Increased for web file editor + sensor action endpoints + new diagnostic endpoints
     config.httpd.stack_size = 8192;  // Reduced stack to save memory
     config.httpd.max_open_sockets = 3;  // Allow multiple connections now that PSRAM is enabled
     config.httpd.lru_purge_enable = true;  // Enable automatic cleanup of old connections
