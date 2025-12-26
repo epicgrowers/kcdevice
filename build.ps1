@@ -12,7 +12,7 @@
     The ESP32 chip target: 's3' (ESP32-S3) or 'c6' (ESP32-C6)
 
 .PARAMETER Action
-    The action to perform: 'build', 'flash', 'monitor', 'clean', 'fullclean', 'menuconfig', or 'all'
+    The action to perform: 'build', 'flash', 'monitor', 'clean', 'fullclean', 'menuconfig', 'test', or 'all'
 
 .PARAMETER Port
     COM port for flashing (e.g., COM3). If not specified, idf.py will auto-detect
@@ -36,7 +36,7 @@ param(
     [string]$Target,
 
     [Parameter(Mandatory=$false, Position=1)]
-    [ValidateSet('build', 'flash', 'monitor', 'clean', 'fullclean', 'menuconfig', 'all')]
+    [ValidateSet('build', 'flash', 'monitor', 'clean', 'fullclean', 'menuconfig', 'test', 'all')]
     [string]$Action = 'build',
 
     [Parameter(Mandatory=$false)]
@@ -119,6 +119,52 @@ switch ($Action) {
     'menuconfig' {
         Write-Host "Opening menuconfig for $($targetConfig.Name)..." -ForegroundColor Green
         & $idfCmd @idfArgs menuconfig
+    }
+    'test' {
+        Write-Host "Building firmware for $($targetConfig.Name) prior to tests..." -ForegroundColor Green
+        & $idfCmd @idfArgs build
+        if ($LASTEXITCODE -ne 0) {
+            break
+        }
+
+        $testDir = Join-Path $PSScriptRoot "test"
+        if (-not (Test-Path $testDir)) {
+            Write-Warning "Test directory '$testDir' not found. Skipping tests."
+            break
+        }
+
+        $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $pythonCmd) {
+            Write-Host "Python executable not found in PATH. Install Python to run tests." -ForegroundColor Red
+            $LASTEXITCODE = 1
+            break
+        }
+
+        $pythonExe = $pythonCmd.Source
+
+        & $pythonExe "-c" "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('pytest') else 1)"
+        $pytestAvailable = ($LASTEXITCODE -eq 0)
+
+        if ($pytestAvailable) {
+            Write-Host "Running pytest suite from '$testDir'..." -ForegroundColor Green
+            & $pythonExe "-m" "pytest" $testDir
+            break
+        }
+
+        Write-Warning "pytest is not installed in the active environment. Running standalone test scripts instead."
+        $testScripts = Get-ChildItem -Path $testDir -Filter 'test_*.py' -File | Sort-Object Name
+        if ($testScripts.Count -eq 0) {
+            Write-Warning "No test_*.py files found in '$testDir'."
+            break
+        }
+
+        foreach ($script in $testScripts) {
+            Write-Host "Executing $($script.Name)..." -ForegroundColor Green
+            & $pythonExe $script.FullName
+            if ($LASTEXITCODE -ne 0) {
+                break
+            }
+        }
     }
     'all' {
         Write-Host "Building and flashing firmware for $($targetConfig.Name)..." -ForegroundColor Green

@@ -10,8 +10,8 @@ import json
 # Disable SSL warnings for self-signed certificate
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Device configuration
-DEVICE_IP = "192.168.1.100"  # Update with your device IP
+# Device configuration (set to hostname or IP reachable from host)
+DEVICE_IP = "kc.local"
 BASE_URL = f"https://{DEVICE_IP}"
 
 def test_batch_config():
