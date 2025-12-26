@@ -24,6 +24,17 @@ managed_components/
 __pycache__/
 *.pyc
 
+# Local helper scripts
+build_sensor_file.py
+build_sensor_file_v2.py
+complete_phase2.py
+extract_sensors.py
+extract_sensors_v2.py
+phase2_clean_http_server.ps1
+phase2_fix.py
+main/http_server.c.backup
+main/http_server.c.marked
+
 # OS
 .DS_Store
 Thumbs.db
