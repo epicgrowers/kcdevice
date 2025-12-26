@@ -17,6 +17,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "api_key_manager.h"
 #include "web_file_editor.h"
 #include "mqtt_telemetry.h"
+#include "http/http_websocket.h"
 #include "esp_https_server.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -61,10 +62,6 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 #define SENSOR_POWER_URI       "/api/sensors/power/"
 #define SENSOR_STATUS_URI      "/api/sensors/status/"
 #define SENSOR_SAMPLE_URI      "/api/sensors/sample/"
-#define SENSOR_WS_URI          "/ws/sensors"
-
-#define SENSOR_WS_MAX_CLIENTS  4
-#define FOCUS_SAMPLE_INTERVAL_MS 2000
 
 typedef struct {
     bool should_resume;
@@ -73,36 +70,15 @@ typedef struct {
 
 static SemaphoreHandle_t s_sensor_guard_mutex = NULL;
 
-typedef struct {
-    int fd;
-    bool active;
-} sensor_ws_client_t;
-
-static sensor_ws_client_t s_ws_clients[SENSOR_WS_MAX_CLIENTS];
-static SemaphoreHandle_t s_ws_clients_mutex = NULL;
-static esp_timer_handle_t s_focus_timer = NULL;
-static bool s_focus_stream_active = false;
-static uint8_t s_focus_sensor_address = 0;
-static bool s_focus_paused_readings = false;
-
 static void sensor_read_guard_acquire(sensor_read_guard_t *guard);
 static void sensor_read_guard_release(sensor_read_guard_t *guard);
-static void handle_sensor_cache_update(const sensor_cache_t *cache, void *ctx);
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache);
-static void sensor_ws_broadcast_json(const char *json, size_t len);
-static void sensor_ws_send_status_event(const sensor_cache_t *cache);
-static void sensor_ws_send_focus_sample(ezo_sensor_t *sensor, const float *values, uint8_t count);
-static void sensor_ws_send_focus_status(const char *status, uint8_t address);
-static esp_err_t sensor_ws_handler(httpd_req_t *req);
-static void handle_ws_command(int client_fd, const char *payload, size_t len);
-static void focus_timer_cb(void *arg);
-static void focus_stream_sample_now(void);
-static esp_err_t focus_stream_start(uint8_t address);
-static void focus_stream_stop(void);
-static void sensor_ws_remove_client(int fd);
-static cJSON *build_sensor_json(ezo_sensor_t *sensor, int index, bool include_runtime);
-static void add_sample_readings_to_json(cJSON *json, const char *type, const float values[], uint8_t count);
+static bool parse_sensor_address_from_uri(const char *uri, const char *prefix, uint8_t *address);
 static ezo_sensor_t *find_sensor_by_address(uint8_t address);
+static void add_capabilities_array(cJSON *parent, uint32_t flags);
+static void append_sensor_runtime_info(cJSON *json, ezo_sensor_t *sensor);
+static cJSON *build_sensor_json(ezo_sensor_t *sensor, int index, bool include_runtime);
+static cJSON *parse_request_json_body(httpd_req_t *req, char **raw_buffer);
 
 static void sensor_read_guard_acquire(sensor_read_guard_t *guard)
 {
@@ -167,182 +143,6 @@ static void sensor_read_guard_release(sensor_read_guard_t *guard)
     }
 }
 
-typedef struct {
-    httpd_handle_t server;
-    int fd;
-    char *payload;
-    size_t len;
-} ws_async_send_arg_t;
-
-static void ws_send_work_cb(void *arg)
-{
-    ws_async_send_arg_t *resp = (ws_async_send_arg_t *)arg;
-    if (resp == NULL) {
-        return;
-    }
-
-    if (resp->server != NULL) {
-        httpd_ws_frame_t frame = {
-            .final = true,
-            .fragmented = false,
-            .type = HTTPD_WS_TYPE_TEXT,
-            .payload = (uint8_t *)resp->payload,
-            .len = resp->len
-        };
-
-        esp_err_t ret = httpd_ws_send_frame_async(resp->server, resp->fd, &frame);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to send WS frame to fd %d: %s", resp->fd, esp_err_to_name(ret));
-            sensor_ws_remove_client(resp->fd);
-        }
-    }
-
-    if (resp->payload != NULL) {
-        free(resp->payload);
-    }
-    free(resp);
-}
-
-static void sensor_ws_ensure_mutex(void)
-{
-    if (s_ws_clients_mutex == NULL) {
-        s_ws_clients_mutex = xSemaphoreCreateMutex();
-        if (s_ws_clients_mutex == NULL) {
-            ESP_LOGE(TAG, "Failed to create WS client mutex");
-        }
-    }
-}
-
-static void sensor_ws_add_client(int fd)
-{
-    sensor_ws_ensure_mutex();
-    if (s_ws_clients_mutex == NULL) {
-        return;
-    }
-    if (xSemaphoreTake(s_ws_clients_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-        bool added = false;
-        for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-            if (!s_ws_clients[i].active) {
-                s_ws_clients[i].active = true;
-                s_ws_clients[i].fd = fd;
-                ESP_LOGI(TAG, "WS client added (fd=%d, slot=%d)", fd, i);
-                added = true;
-                break;
-            }
-        }
-        xSemaphoreGive(s_ws_clients_mutex);
-
-        if (!added) {
-            ESP_LOGW(TAG, "WS client limit reached, closing fd %d", fd);
-            httpd_sess_trigger_close(s_server, fd);
-        }
-    }
-}
-
-static void sensor_ws_remove_client(int fd)
-{
-    if (s_ws_clients_mutex == NULL) {
-        return;
-    }
-    if (xSemaphoreTake(s_ws_clients_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-        for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-            if (s_ws_clients[i].active && s_ws_clients[i].fd == fd) {
-                ESP_LOGI(TAG, "WS client removed (fd=%d)", fd);
-                s_ws_clients[i].active = false;
-                s_ws_clients[i].fd = -1;
-                break;
-            }
-        }
-        bool any_active = false;
-        for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-            if (s_ws_clients[i].active) {
-                any_active = true;
-                break;
-            }
-        }
-        xSemaphoreGive(s_ws_clients_mutex);
-
-        if (!any_active && s_focus_stream_active) {
-            ESP_LOGI(TAG, "No WS clients connected, stopping focus stream");
-            focus_stream_stop();
-        }
-    }
-}
-
-static bool sensor_ws_has_clients(void)
-{
-    if (s_ws_clients_mutex == NULL) {
-        return false;
-    }
-    bool result = false;
-    if (xSemaphoreTake(s_ws_clients_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-        for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-            if (s_ws_clients[i].active) {
-                result = true;
-                break;
-            }
-        }
-        xSemaphoreGive(s_ws_clients_mutex);
-    }
-    return result;
-}
-
-static void sensor_ws_send_json_to_client(int fd, const char *json, size_t len)
-{
-    if (s_server == NULL || json == NULL || len == 0) {
-        return;
-    }
-
-    ws_async_send_arg_t *arg = calloc(1, sizeof(ws_async_send_arg_t));
-    if (arg == NULL) {
-        return;
-    }
-    arg->payload = malloc(len);
-    if (arg->payload == NULL) {
-        free(arg);
-        return;
-    }
-    memcpy(arg->payload, json, len);
-    arg->len = len;
-    arg->fd = fd;
-    arg->server = s_server;
-
-    if (httpd_queue_work(s_server, ws_send_work_cb, arg) != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to queue WS send work");
-        free(arg->payload);
-        free(arg);
-    }
-}
-
-static void sensor_ws_broadcast_json(const char *json, size_t len)
-{
-    if (json == NULL || len == 0 || s_server == NULL) {
-        return;
-    }
-    if (!sensor_ws_has_clients()) {
-        return;
-    }
-
-    if (s_ws_clients_mutex == NULL) {
-        return;
-    }
-
-    int targets[SENSOR_WS_MAX_CLIENTS];
-    size_t target_count = 0;
-    if (xSemaphoreTake(s_ws_clients_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-        for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-            if (s_ws_clients[i].active && target_count < SENSOR_WS_MAX_CLIENTS) {
-                targets[target_count++] = s_ws_clients[i].fd;
-            }
-        }
-        xSemaphoreGive(s_ws_clients_mutex);
-    }
-
-    for (size_t i = 0; i < target_count; i++) {
-        sensor_ws_send_json_to_client(targets[i], json, len);
-    }
-}
-
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache)
 {
     cJSON *sensors = cJSON_CreateObject();
@@ -389,279 +189,6 @@ static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache)
     }
 
     return sensors;
-}
-
-static void sensor_ws_emit_status_payload(const sensor_cache_t *cache, int target_fd)
-{
-    if (cache == NULL) {
-        return;
-    }
-
-    cJSON *root = cJSON_CreateObject();
-    if (root == NULL) {
-        return;
-    }
-
-    cJSON_AddStringToObject(root, "type", "status_snapshot");
-    cJSON_AddNumberToObject(root, "timestamp_ms", (double)(cache->timestamp_us / 1000ULL));
-    if (cache->battery_valid) {
-        cJSON_AddNumberToObject(root, "battery", cache->battery_percentage);
-    }
-    cJSON_AddNumberToObject(root, "rssi", cache->rssi);
-
-    cJSON *sensors = create_sensors_object_from_cache(cache);
-    if (sensors != NULL) {
-        cJSON_AddItemToObject(root, "sensors", sensors);
-    }
-
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-
-    if (json != NULL) {
-        if (target_fd >= 0) {
-            sensor_ws_send_json_to_client(target_fd, json, strlen(json));
-        } else {
-            sensor_ws_broadcast_json(json, strlen(json));
-        }
-        free(json);
-    }
-}
-
-static void sensor_ws_send_status_event(const sensor_cache_t *cache)
-{
-    sensor_ws_emit_status_payload(cache, -1);
-}
-
-static void sensor_ws_send_snapshot_to_client(int fd)
-{
-    sensor_cache_t cache;
-    if (sensor_manager_get_cached_data(&cache) == ESP_OK) {
-        sensor_ws_emit_status_payload(&cache, fd);
-    }
-}
-
-static void handle_sensor_cache_update(const sensor_cache_t *cache, void *ctx)
-{
-    (void)ctx;
-    sensor_ws_send_status_event(cache);
-}
-
-static void sensor_ws_send_focus_status(const char *status, uint8_t address)
-{
-    if (status == NULL) {
-        return;
-    }
-
-    cJSON *root = cJSON_CreateObject();
-    if (root == NULL) {
-        return;
-    }
-
-    cJSON_AddStringToObject(root, "type", "focus_status");
-    cJSON_AddStringToObject(root, "status", status);
-    cJSON_AddNumberToObject(root, "address", address);
-
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-
-    if (json != NULL) {
-        sensor_ws_broadcast_json(json, strlen(json));
-        free(json);
-    }
-}
-
-static void sensor_ws_send_focus_sample(ezo_sensor_t *sensor, const float *values, uint8_t count)
-{
-    if (sensor == NULL || values == NULL || count == 0) {
-        return;
-    }
-
-    cJSON *sensor_json = build_sensor_json(sensor, -1, true);
-    if (sensor_json == NULL) {
-        return;
-    }
-
-    uint64_t timestamp_ms = esp_timer_get_time() / 1000ULL;
-    cJSON_AddNumberToObject(sensor_json, "timestamp_ms", (double)timestamp_ms);
-    cJSON_AddNumberToObject(sensor_json, "value_count", count);
-
-    cJSON *raw = cJSON_CreateArray();
-    if (raw != NULL) {
-        for (uint8_t i = 0; i < count; i++) {
-            cJSON_AddItemToArray(raw, cJSON_CreateNumber(values[i]));
-        }
-        cJSON_AddItemToObject(sensor_json, "raw", raw);
-    }
-
-    add_sample_readings_to_json(sensor_json, sensor->config.type, values, count);
-
-    cJSON *root = cJSON_CreateObject();
-    if (root == NULL) {
-        cJSON_Delete(sensor_json);
-        return;
-    }
-
-    cJSON_AddStringToObject(root, "type", "focus_sample");
-    cJSON_AddItemToObject(root, "sensor", sensor_json);
-
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-
-    if (json != NULL) {
-        sensor_ws_broadcast_json(json, strlen(json));
-        free(json);
-    }
-}
-
-static void focus_timer_cb(void *arg)
-{
-    (void)arg;
-    focus_stream_sample_now();
-}
-
-static void wait_for_sensor_reading_idle(void)
-{
-    const TickType_t timeout_ticks = pdMS_TO_TICKS(EZO_LONG_WAIT_MS + 2000);
-    TickType_t start = xTaskGetTickCount();
-    while (sensor_manager_is_reading_in_progress()) {
-        if ((xTaskGetTickCount() - start) > timeout_ticks) {
-            ESP_LOGW(TAG, "Timeout waiting for sensor reading task to idle");
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
-}
-
-static esp_err_t focus_stream_start(uint8_t address)
-{
-    ezo_sensor_t *sensor = find_sensor_by_address(address);
-    if (sensor == NULL) {
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    if (s_focus_stream_active) {
-        s_focus_sensor_address = address;
-        focus_stream_sample_now();
-        sensor_ws_send_focus_status("started", address);
-        return ESP_OK;
-    }
-
-    if (!sensor_manager_is_reading_paused()) {
-        sensor_manager_pause_reading();
-        s_focus_paused_readings = true;
-    } else {
-        s_focus_paused_readings = false;
-    }
-
-    wait_for_sensor_reading_idle();
-
-    s_focus_sensor_address = address;
-    s_focus_stream_active = true;
-
-    if (s_focus_timer == NULL) {
-        esp_timer_create_args_t args = {
-            .callback = focus_timer_cb,
-            .arg = NULL,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "focus_stream"
-        };
-        if (esp_timer_create(&args, &s_focus_timer) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to create focus stream timer");
-            s_focus_stream_active = false;
-            return ESP_FAIL;
-        }
-    } else {
-        esp_timer_stop(s_focus_timer);
-    }
-
-    focus_stream_sample_now();
-
-    esp_timer_start_periodic(s_focus_timer, FOCUS_SAMPLE_INTERVAL_MS * 1000ULL);
-    sensor_ws_send_focus_status("started", address);
-    return ESP_OK;
-}
-
-static void focus_stream_stop(void)
-{
-    if (s_focus_timer != NULL) {
-        esp_timer_stop(s_focus_timer);
-    }
-
-    if (!s_focus_stream_active && !s_focus_paused_readings) {
-        return;
-    }
-
-    uint8_t last_address = s_focus_sensor_address;
-    s_focus_stream_active = false;
-    s_focus_sensor_address = 0;
-
-    if (s_focus_paused_readings) {
-        sensor_manager_resume_reading();
-        s_focus_paused_readings = false;
-    }
-
-    sensor_ws_send_focus_status("stopped", last_address);
-}
-
-static void focus_stream_sample_now(void)
-{
-    if (!s_focus_stream_active) {
-        return;
-    }
-
-    ezo_sensor_t *sensor = find_sensor_by_address(s_focus_sensor_address);
-    if (sensor == NULL) {
-        ESP_LOGW(TAG, "Focus sensor 0x%02X not found", s_focus_sensor_address);
-        focus_stream_stop();
-        return;
-    }
-
-    float values[4] = {0};
-    uint8_t count = 0;
-
-    sensor_read_guard_t guard;
-    sensor_read_guard_acquire(&guard);
-    esp_err_t ret = ezo_sensor_read_all(sensor, values, &count);
-    sensor_read_guard_release(&guard);
-
-    if (ret == ESP_OK && count > 0) {
-        sensor_ws_send_focus_sample(sensor, values, count);
-    } else {
-        ESP_LOGW(TAG, "Focus read failed for 0x%02X: %s", sensor->config.i2c_address, esp_err_to_name(ret));
-    }
-}
-
-static void handle_ws_command(int client_fd, const char *payload, size_t len)
-{
-    if (payload == NULL || len == 0) {
-        return;
-    }
-
-    cJSON *root = cJSON_ParseWithLength(payload, len);
-    if (root == NULL) {
-        ESP_LOGW(TAG, "Invalid WS payload");
-        return;
-    }
-
-    cJSON *action = cJSON_GetObjectItem(root, "action");
-    if (cJSON_IsString(action) && action->valuestring != NULL) {
-        if (strcmp(action->valuestring, "request_snapshot") == 0) {
-            sensor_ws_send_snapshot_to_client(client_fd);
-        } else if (strcmp(action->valuestring, "focus_start") == 0) {
-            cJSON *addr = cJSON_GetObjectItem(root, "address");
-            if (cJSON_IsNumber(addr)) {
-                uint8_t address = (uint8_t)addr->valueint;
-                esp_err_t ret = focus_stream_start(address);
-                if (ret != ESP_OK) {
-                    sensor_ws_send_focus_status("error", address);
-                }
-            }
-        } else if (strcmp(action->valuestring, "focus_stop") == 0) {
-            focus_stream_stop();
-        }
-    }
-
-    cJSON_Delete(root);
 }
 
 static bool parse_sensor_address_from_uri(const char *uri, const char *prefix, uint8_t *address)
@@ -984,57 +511,6 @@ static esp_err_t api_status_handler(httpd_req_t *req)
     
     free((void *)json_str);
     cJSON_Delete(root);
-    return ESP_OK;
-}
-
-static esp_err_t sensor_ws_handler(httpd_req_t *req)
-{
-    int client_fd = httpd_req_to_sockfd(req);
-    if (req->method == HTTP_GET) {
-        sensor_ws_add_client(client_fd);
-        sensor_ws_send_snapshot_to_client(client_fd);
-        return ESP_OK;
-    }
-
-    httpd_ws_frame_t frame = {
-        .type = HTTPD_WS_TYPE_TEXT,
-        .final = true,
-        .fragmented = false,
-        .payload = NULL,
-        .len = 0
-    };
-
-    esp_err_t ret = httpd_ws_recv_frame(req, &frame, 0);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    if (frame.len > 0) {
-        frame.payload = malloc(frame.len + 1);
-        if (frame.payload == NULL) {
-            return ESP_ERR_NO_MEM;
-        }
-        ret = httpd_ws_recv_frame(req, &frame, frame.len);
-        if (ret != ESP_OK) {
-            free(frame.payload);
-            return ret;
-        }
-        frame.payload[frame.len] = '\0';
-    }
-
-    if (frame.type == HTTPD_WS_TYPE_TEXT && frame.payload != NULL) {
-        handle_ws_command(client_fd, (const char *)frame.payload, frame.len);
-    } else if (frame.type == HTTPD_WS_TYPE_CLOSE) {
-        sensor_ws_remove_client(client_fd);
-    } else if (frame.type == HTTPD_WS_TYPE_PING) {
-        frame.type = HTTPD_WS_TYPE_PONG;
-        httpd_ws_send_frame(req, &frame);
-    }
-
-    if (frame.payload != NULL) {
-        free(frame.payload);
-    }
-
     return ESP_OK;
 }
 
@@ -3729,14 +3205,6 @@ static const httpd_uri_t ca_cert_uri = {
     .user_ctx = NULL
 };
 
-static const httpd_uri_t sensor_ws_uri = {
-    .uri = SENSOR_WS_URI,
-    .method = HTTP_GET,
-    .handler = sensor_ws_handler,
-    .user_ctx = NULL,
-    .is_websocket = true
-};
-
 esp_err_t http_server_start(void)
 {
     if (s_server != NULL) {
@@ -3824,7 +3292,6 @@ esp_err_t http_server_start(void)
     // Register URI handlers
     httpd_register_uri_handler(s_server, &favicon_uri);
     httpd_register_uri_handler(s_server, &root_uri);
-    httpd_register_uri_handler(s_server, &sensor_ws_uri);
     httpd_register_uri_handler(s_server, &ca_cert_uri);  // CA certificate download
     httpd_register_uri_handler(s_server, &api_status_uri);
     httpd_register_uri_handler(s_server, &api_clear_wifi_uri);
@@ -3866,7 +3333,10 @@ esp_err_t http_server_start(void)
     httpd_register_uri_handler(s_server, &api_webfiles_put_uri);
     httpd_register_uri_handler(s_server, &api_firmware_upload_uri);
     
-    sensor_manager_register_cache_listener(handle_sensor_cache_update, NULL);
+    // Initialize WebSocket module
+    http_websocket_init(s_server);
+    
+    sensor_manager_register_cache_listener(http_websocket_cache_update_handler, NULL);
 
     ESP_LOGI(TAG, "✓ HTTPS server started successfully");
     ESP_LOGI(TAG, "Dashboard accessible at: https://kc.local");
@@ -3881,21 +3351,8 @@ esp_err_t http_server_stop(void)
         return ESP_OK;
     }
     
+    http_websocket_deinit();
     sensor_manager_register_cache_listener(NULL, NULL);
-    focus_stream_stop();
-    if (s_focus_timer != NULL) {
-        esp_timer_delete(s_focus_timer);
-        s_focus_timer = NULL;
-    }
-    if (s_ws_clients_mutex != NULL) {
-        if (xSemaphoreTake(s_ws_clients_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            for (int i = 0; i < SENSOR_WS_MAX_CLIENTS; i++) {
-                s_ws_clients[i].active = false;
-                s_ws_clients[i].fd = -1;
-            }
-            xSemaphoreGive(s_ws_clients_mutex);
-        }
-    }
 
     ESP_LOGI(TAG, "Stopping HTTPS server");
     httpd_ssl_stop(s_server);
