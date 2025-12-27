@@ -35,6 +35,7 @@ static const char *TAG = "MAIN";
 #define WIFI_CONNECT_TIMEOUT_MS        10000  // WiFi connection timeout (10 seconds)
 #define WIFI_RETRY_INTERVAL_MS         30000  // WiFi retry interval (30 seconds)
 #define CLOUD_PROVISION_RETRY_MS       60000  // Cloud provision retry (60 seconds)
+#define NETWORK_READY_WAIT_MS          30000  // Optional wait for network readiness (30 seconds)
 
 // Task Configuration
 #define SENSOR_TASK_STACK_SIZE         4096   // 4KB stack
@@ -362,12 +363,19 @@ void app_main(void)
         ESP_LOGW(TAG, "MAIN: Sensor task timeout (60s), continuing anyway");
     }
     
-    // Network task is optional - don't wait, just check status
-    bits = xEventGroupGetBits(s_boot_event_group);
+    ESP_LOGI(TAG, "MAIN: Waiting up to %dms for network services (optional)...", NETWORK_READY_WAIT_MS);
+    bits = xEventGroupWaitBits(
+        s_boot_event_group,
+        NETWORK_READY_BIT,
+        pdFALSE,
+        pdFALSE,
+        pdMS_TO_TICKS(NETWORK_READY_WAIT_MS)
+    );
+
     if (bits & NETWORK_READY_BIT) {
         ESP_LOGI(TAG, "MAIN: ✓ Network services ready");
     } else {
-        ESP_LOGI(TAG, "MAIN: Network services still initializing (running in background)");
+        ESP_LOGW(TAG, "MAIN: Network services still initializing after %dms, continuing offline", NETWORK_READY_WAIT_MS);
     }
     
     // ========================================================================

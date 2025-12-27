@@ -865,7 +865,8 @@ NETWORK_TASK (Parallel)
 ├─ Launch SENSOR_TASK (priority 5)
 ├─ Launch NETWORK_TASK (priority 3)
 └─ Wait for SENSORS_READY (timeout 60s)
-    └─ NETWORK_READY is optional (device works offline)
+  ├─ NETWORK_READY wait is optional (device works offline)
+  └─ Pause up to 30s for NETWORK_READY before continuing; log offline mode if timeout
 
 [20-60s] Normal Operation
 ├─ Sensors are operational
@@ -1736,6 +1737,8 @@ T+25s:  Re-init successful! Resume normal readings
 - [ ] Wait for SENSORS_READY (required)
 - [ ] Wait for NETWORK_READY (optional, with timeout)
 - [ ] Enter normal operation mode
+
+*Implementation note*: The coordinator now blocks on `SENSORS_READY` but only waits up to 30 seconds for `NETWORK_READY` before proceeding, logging that network services will finish in the background if the timeout expires.
 
 ### Phase 6: Testing
 - [ ] Test all sensors found (best case)
