@@ -115,6 +115,14 @@ bool sensor_manager_has_battery_monitor(void);
  */
 void* sensor_manager_get_ezo_sensor(uint8_t index);
 
+typedef struct {
+    char type[16];
+    char name[32];
+    uint8_t address;
+} sensor_manager_ezo_info_t;
+
+bool sensor_manager_get_ezo_info(uint8_t index, sensor_manager_ezo_info_t *info);
+
 /**
  * @brief Read all values from an EZO sensor by index
  * 

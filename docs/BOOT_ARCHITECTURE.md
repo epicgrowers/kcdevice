@@ -978,6 +978,10 @@ Timing:
 └─ No errors for missing sensors - this is valid configuration
 ```
 
+**New in Phase 4 (telemetry build)**:
+- The firmware now emits a normalized inventory summary (`Found:` / `Missing:`) that matches the logs above and immediately pushes the same summary to MQTT via the `boot_monitor_publish()` helper so Phase 4 readiness is visible from the cloud console.
+- Inventory strings are generated from the actual sensors detected (`sensor_manager_get_ezo_info`) so any combination of EZO boards shows up verbatim in the log and telemetry payloads.
+
 **Important**: There are no "expected" sensors. Any combination (including zero sensors) is valid.
 
 #### Phase 5: Start Reading Loop (20s)
@@ -1162,6 +1166,10 @@ Initialize HTTPS Server:
 │
 ├─ Start server
 └─ Log: "✓ HTTPS server started on port 443"
+
+Safeguards now in place:
+- `cloud_prov_has_certificates()` must return true before HTTPS or mDNS spin up. If certificates are missing, the network task logs the issue and skips HTTPS startup rather than entering a crash/retry loop.
+- When SNTP has not confirmed yet, the task emits a warning (`Time sync incomplete...`) so operators understand why browsers might briefly complain about certificate validity. Once time catches up, the dashboard works without rebooting.
 
 WebSocket features:
 ├─ Real-time sensor data broadcast (every reading)
@@ -1716,6 +1724,11 @@ T+25s:  Re-init successful! Resume normal readings
 - [ ] Add 2-minute retry timer
 - [ ] WiFi reconnection handling
 - [ ] MQTT reconnection handling
+
+### Boot Telemetry Hooks
+- `boot_monitor_publish()` emits MQTT status lines whenever Phase 4 milestones finish (`sensors_ready`, `network_ready`).
+- Messages reuse the same normalized strings that the logs print (`found=..., missing=...`) so remote operators see identical context without needing serial output.
+- Publishing is opportunistic: if MQTT is not yet connected when sensors finish, the helper quietly skips the send to avoid blocking boot.
 
 ### Phase 5: Main Task Updates
 - [ ] Launch sensor task

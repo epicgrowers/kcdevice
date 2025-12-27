@@ -319,6 +319,20 @@ void* sensor_manager_get_ezo_sensor(uint8_t index) {
     return &s_ezo_sensors[index];
 }
 
+bool sensor_manager_get_ezo_info(uint8_t index, sensor_manager_ezo_info_t *info) {
+    if (info == NULL || index >= s_ezo_count) {
+        return false;
+    }
+
+    const ezo_sensor_t *sensor = &s_ezo_sensors[index];
+    strncpy(info->type, sensor->config.type, sizeof(info->type) - 1);
+    info->type[sizeof(info->type) - 1] = '\0';
+    strncpy(info->name, sensor->config.name, sizeof(info->name) - 1);
+    info->name[sizeof(info->name) - 1] = '\0';
+    info->address = sensor->config.i2c_address;
+    return true;
+}
+
 /**
  * @brief Read all values from an EZO sensor by index
  * 

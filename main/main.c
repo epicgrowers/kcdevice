@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_log.h"
+#include "esp_err.h"
 #include "nvs_flash.h"
 #include "chip_info.h"
 #include "idf_provisioning.h"
@@ -46,6 +48,71 @@ static const char *TAG = "MAIN";
 
 // Global event group for task synchronization
 static EventGroupHandle_t s_boot_event_group = NULL;
+
+typedef struct {
+    const char *label;
+    uint8_t address;
+} sensor_expectation_t;
+
+static const sensor_expectation_t s_expected_ezo_sensors[] = {
+    {"GEN", 0x16},
+    {"pH", 0x63},
+    {"EC", 0x64},
+    {"RTD", 0x66},
+    {"HUM", 0x6F},
+};
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+static void append_csv(char *buffer, size_t buffer_len, const char *entry)
+{
+    if (buffer == NULL || entry == NULL || buffer_len == 0) {
+        return;
+    }
+
+    size_t current_len = strlen(buffer);
+    if (current_len >= buffer_len - 1) {
+        return;
+    }
+
+    if (current_len > 0) {
+        if (current_len + 2 >= buffer_len - 1) {
+            return;
+        }
+        buffer[current_len++] = ',';
+        buffer[current_len++] = ' ';
+        buffer[current_len] = '\0';
+    }
+
+    size_t remaining = buffer_len - current_len - 1;
+    strncat(buffer, entry, remaining);
+}
+
+static void boot_monitor_publish(const char *stage, const char *detail)
+{
+    if (stage == NULL) {
+        return;
+    }
+
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGD(TAG, "BOOT_MON: MQTT not ready, skipping %s", stage);
+        return;
+    }
+
+    char payload[160];
+    if (detail != NULL && detail[0] != '\0') {
+        snprintf(payload, sizeof(payload), "%s | %s", stage, detail);
+    } else {
+        snprintf(payload, sizeof(payload), "%s", stage);
+    }
+
+    esp_err_t err = mqtt_publish_status(payload);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "BOOT_MON: Failed to publish %s: %s", stage, esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "BOOT_MON: Published %s", stage);
+    }
+}
 
 // ============================================================================
 // Forward Declarations
@@ -381,13 +448,61 @@ static void sensor_task(void *arg)
     // Phase 4: Final Verification Scan
     ESP_LOGI(TAG, "SENSOR: Performing final I2C verification scan...");
     i2c_scanner_scan();
-    
-    // Log comprehensive sensor inventory
+
+    bool found_expectations[ARRAY_SIZE(s_expected_ezo_sensors)] = {0};
+    char found_list[128] = {0};
+    char missing_list[128] = {0};
+    const uint8_t total_ezo = sensor_manager_get_ezo_count();
+
+    for (uint8_t idx = 0; idx < total_ezo; idx++) {
+        sensor_manager_ezo_info_t info = {0};
+        if (!sensor_manager_get_ezo_info(idx, &info)) {
+            continue;
+        }
+
+        char entry[32];
+        snprintf(entry, sizeof(entry), "%s (0x%02X)", info.type, info.address);
+        append_csv(found_list, sizeof(found_list), entry);
+
+        for (size_t expect_idx = 0; expect_idx < ARRAY_SIZE(s_expected_ezo_sensors); expect_idx++) {
+            if (s_expected_ezo_sensors[expect_idx].address == info.address ||
+                strcmp(s_expected_ezo_sensors[expect_idx].label, info.type) == 0) {
+                found_expectations[expect_idx] = true;
+            }
+        }
+    }
+
+    for (size_t expect_idx = 0; expect_idx < ARRAY_SIZE(s_expected_ezo_sensors); expect_idx++) {
+        if (found_expectations[expect_idx]) {
+            continue;
+        }
+
+        char entry[32];
+        snprintf(entry, sizeof(entry), "%s (0x%02X)",
+                 s_expected_ezo_sensors[expect_idx].label,
+                 s_expected_ezo_sensors[expect_idx].address);
+        append_csv(missing_list, sizeof(missing_list), entry);
+    }
+
+    const bool battery_present = sensor_manager_has_battery_monitor();
+    const char *found_summary = (found_list[0] != '\0') ? found_list : "None detected";
+    const char *missing_summary = (missing_list[0] != '\0') ? missing_list : "None";
+
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "SENSOR INVENTORY:");
-    ESP_LOGI(TAG, "  Battery Monitor: %s", sensor_manager_has_battery_monitor() ? "YES" : "NO");
-    ESP_LOGI(TAG, "  EZO Sensors: %d", sensor_manager_get_ezo_count());
+    ESP_LOGI(TAG, "SENSOR INVENTORY SUMMARY");
+    ESP_LOGI(TAG, "  Battery Monitor: %s", battery_present ? "YES" : "NO");
+    ESP_LOGI(TAG, "  EZO Sensors: %u", total_ezo);
+    ESP_LOGI(TAG, "  Found: %s", found_summary);
+    ESP_LOGI(TAG, "  Missing (optional): %s", missing_summary);
     ESP_LOGI(TAG, "========================================");
+
+    char telemetry_detail[192];
+    snprintf(telemetry_detail, sizeof(telemetry_detail),
+             "found=%.80s | missing=%.80s | battery=%s",
+             found_summary,
+             missing_summary,
+             battery_present ? "yes" : "no");
+    boot_monitor_publish("sensors_ready", telemetry_detail);
     
     // Phase 5: Start Sensor Reading Task
     ESP_LOGI(TAG, "SENSOR: Starting sensor reading task...");
@@ -419,6 +534,12 @@ static void network_task(void *arg)
     ESP_LOGI(TAG, "========================================");
     
     esp_err_t ret;
+    bool mqtt_started = false;
+#ifndef CONFIG_IDF_TARGET_ESP32C6
+    bool https_started = false;
+#endif
+    bool tls_ready = false;
+    bool time_synced = false;
     
     // WiFi should already be initialized and connected by this point from app_main
     // But we'll verify and wait if needed
@@ -454,8 +575,11 @@ static void network_task(void *arg)
         sync_wait++;
     }
     
-    if (!time_sync_is_synced()) {
+    time_synced = time_sync_is_synced();
+    if (!time_synced) {
         ESP_LOGW(TAG, "NETWORK: Time sync timeout, TLS may fail");
+    } else {
+        ESP_LOGI(TAG, "NETWORK: Time synchronized successfully");
     }
     
     // Phase 2: Cloud Provisioning (CRITICAL - must complete before TLS services)
@@ -489,6 +613,13 @@ static void network_task(void *arg)
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "NETWORK: Failed to download MQTT CA cert: %s", esp_err_to_name(ret));
     }
+
+    tls_ready = cloud_prov_has_certificates();
+    if (!tls_ready) {
+        ESP_LOGW(TAG, "NETWORK: TLS certificates not available after provisioning");
+    } else {
+        ESP_LOGI(TAG, "NETWORK: TLS certificates verified");
+    }
     
     // Phase 3: Start MQTT Client (requires certificates)
     ESP_LOGI(TAG, "NETWORK: Initializing MQTT client...");
@@ -500,6 +631,7 @@ static void network_task(void *arg)
     if (ret == ESP_OK) {
         ret = mqtt_client_start();
         if (ret == ESP_OK) {
+            mqtt_started = true;
             ESP_LOGI(TAG, "NETWORK: ✓ MQTT client started");
         } else {
             ESP_LOGW(TAG, "NETWORK: Failed to start MQTT: %s", esp_err_to_name(ret));
@@ -509,22 +641,30 @@ static void network_task(void *arg)
     }
     
 #ifndef CONFIG_IDF_TARGET_ESP32C6
-    // Phase 4: Start HTTPS Server (S3 only, requires certificates)
-    ESP_LOGI(TAG, "NETWORK: Initializing mDNS service...");
-    ret = mdns_service_init("kc", "KannaCloud Device");
-    if (ret == ESP_OK) {
-        mdns_service_add_https(443);
+    if (!tls_ready) {
+        ESP_LOGW(TAG, "NETWORK: TLS assets unavailable, skipping HTTPS server startup");
     } else {
-        ESP_LOGW(TAG, "NETWORK: mDNS init failed: %s", esp_err_to_name(ret));
-    }
-    
-    ESP_LOGI(TAG, "NETWORK: Starting HTTPS dashboard server...");
-    ret = http_server_start();
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "NETWORK: ✓ HTTPS server started");
-        ESP_LOGI(TAG, "NETWORK: ✓ Access dashboard at: https://kc.local");
-    } else {
-        ESP_LOGE(TAG, "NETWORK: Failed to start HTTPS server: %s", esp_err_to_name(ret));
+        ESP_LOGI(TAG, "NETWORK: Initializing mDNS service...");
+        ret = mdns_service_init("kc", "KannaCloud Device");
+        if (ret == ESP_OK) {
+            mdns_service_add_https(443);
+        } else {
+            ESP_LOGW(TAG, "NETWORK: mDNS init failed: %s", esp_err_to_name(ret));
+        }
+
+        if (!time_synced) {
+            ESP_LOGW(TAG, "NETWORK: Time sync incomplete, HTTPS clients may warn about certificates");
+        }
+
+        ESP_LOGI(TAG, "NETWORK: Starting HTTPS dashboard server...");
+        ret = http_server_start();
+        if (ret == ESP_OK) {
+            https_started = true;
+            ESP_LOGI(TAG, "NETWORK: ✓ HTTPS server started");
+            ESP_LOGI(TAG, "NETWORK: ✓ Access dashboard at: https://kc.local");
+        } else {
+            ESP_LOGE(TAG, "NETWORK: Failed to start HTTPS server: %s", esp_err_to_name(ret));
+        }
     }
 #else
     ESP_LOGI(TAG, "NETWORK: Running in cloud-only mode (ESP32-C6)");
@@ -535,6 +675,23 @@ static void network_task(void *arg)
     ESP_LOGI(TAG, "NETWORK: ✓ All network services started");
     ESP_LOGI(TAG, "========================================");
     xEventGroupSetBits(s_boot_event_group, NETWORK_READY_BIT);
+
+    char network_detail[160];
+#ifndef CONFIG_IDF_TARGET_ESP32C6
+    snprintf(network_detail, sizeof(network_detail),
+             "tls=%s ntp=%s mqtt=%s https=%s",
+             tls_ready ? "ready" : "missing",
+             time_synced ? "synced" : "timeout",
+             mqtt_started ? "ready" : "degraded",
+             https_started ? "enabled" : "skipped");
+#else
+    snprintf(network_detail, sizeof(network_detail),
+             "tls=%s ntp=%s mqtt=%s https=disabled",
+             tls_ready ? "ready" : "missing",
+             time_synced ? "synced" : "timeout",
+             mqtt_started ? "ready" : "degraded");
+#endif
+    boot_monitor_publish("network_ready", network_detail);
     
     // Task complete - delete itself
     vTaskDelete(NULL);
