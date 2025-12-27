@@ -7,7 +7,8 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
-#include "sensor_manager.h"
+#include "sensors/sensor_manager.h"
+#include "sensors/pipeline.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,7 +50,7 @@ esp_err_t sensor_ws_handler(httpd_req_t *req);
  * @param cache Sensor cache data
  * @param ctx User context (unused)
  */
-void http_websocket_cache_update_handler(const sensor_cache_t *cache, void *ctx);
+void http_websocket_snapshot_handler(const sensor_pipeline_snapshot_t *snapshot, void *ctx);
 
 #ifdef __cplusplus
 }

@@ -9,14 +9,18 @@ Secure Wi-Fi provisioning firmware for ESP32-S3 and ESP32-C6 chips based on the 
 
 ## Highlights
 
-- **ESP-IDF Provisioning Manager** (`main/idf_provisioning.c/.h`)
+- **Provisioning Runner** (`main/provisioning/provisioning_runner.c/.h`)
+  - Attempts stored-credential reconnection before falling back to BLE provisioning
+  - Launches sensor boot work while the user interacts with the app
+  - Exposes `provisioning_run()` and the reconnection guard so `app_main()` remains orchestration-only
+- **ESP-IDF Provisioning Manager** (`main/provisioning/idf_provisioning.c/.h`)
   - BLE transport with Espressif's provisioning schemas and characteristic layout handled by the framework
   - Security 1 (X25519 + PoP) handshake with shared password `sumppop`
   - Automatic teardown of BLE resources when Wi-Fi connects
 - **Wi-Fi Manager** (`main/wifi_manager.c/.h`)
   - Stores credentials securely in NVS after a successful DHCP lease
   - Handles reconnect logic, retry timers, and credential clearing
-- **Provisioning State Machine** (`main/provisioning_state.c/.h`)
+- **Provisioning State Machine** (`main/provisioning/provisioning_state.c/.h`)
   - Centralized event callbacks for logging/UI updates
   - Shared enum/status codes consumed by the provisioning manager and Wi-Fi stack
 - **Reset Button Integration** (`main/reset_button.c/.h`)
@@ -29,11 +33,13 @@ Secure Wi-Fi provisioning firmware for ESP32-S3 and ESP32-C6 chips based on the 
 
 ```
 main/
-  idf_provisioning.c/.h   # ESP-IDF provisioning manager wrapper
-  wifi_manager.c/.h       # Wi-Fi + NVS logic
-  provisioning_state.c/.h # Shared provisioning state machine
-  reset_button.c/.h       # GPIO0 short/long press handling
-  ...                     # Cloud, HTTP, MQTT, sensors, etc.
+  provisioning/
+    provisioning_runner.c/.h  # Stored creds + BLE provisioning surface
+    idf_provisioning.c/.h     # ESP-IDF provisioning manager wrapper
+    provisioning_state.c/.h   # Shared provisioning state machine
+  wifi_manager.c/.h           # Wi-Fi + NVS logic
+  reset_button.c/.h           # GPIO0 short/long press handling
+  ...                         # Cloud, HTTP, MQTT, sensors, etc.
 config/
   partitions.csv          # Enlarged OTA slots (0x1B0000 each)
   sdkconfig.defaults      # ESP32-S3 default config
@@ -81,15 +87,15 @@ Key runtime facts:
 
 ## Provisioning Flow
 
-1. Boot -> `wifi_manager` attempts stored credentials (if any)
+1. `provisioning_run()` initializes `wifi_manager` and attempts stored credentials (if configured)
 2. Failure or no credentials -> `idf_provisioning_start()` launches the ESP-IDF provisioning manager
 3. User connects via app, enters PoP, and sends SSID/password
-4. `wifi_manager_connect()` applies creds, saves them to NVS upon DHCP success, and stops the provisioning manager
-5. Cloud/time-sync/HTTPS/MQTT stacks start once `wifi_manager_is_connected()` returns true
+4. `wifi_manager_connect()`/ESP-IDF provisioning flow applies creds, saves them to NVS upon DHCP success, and tears down BLE
+5. `provisioning_connection_guard_poll()` keeps Wi-Fi healthy while the rest of the system (cloud/time-sync/HTTPS/MQTT) waits on readiness bits
 
 ## Maintenance Notes
 
-- The legacy `ble_provisioning.c/.h` implementation and its custom UUID mapping have been removed. All provisioning now routes through `idf_provisioning.c`.
+- The legacy `ble_provisioning.c/.h` implementation and its custom UUID mapping have been removed. All provisioning now routes through `provisioning/idf_provisioning.c`.
 - If firmware size grows again, adjust `config/partitions.csv`; OTA slots currently provide ~64 KB of headroom over the latest build.
 - Use `idf.py monitor` to view provisioning logs (`idf_prov`, `wifi_prov_mgr`, `wifi_manager`). Security failures will show up as `WIFI_PROV_CRED_FAIL` events.
 

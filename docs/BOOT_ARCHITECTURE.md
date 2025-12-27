@@ -14,6 +14,31 @@ This document describes the parallel boot architecture for the KannaCloud device
 6. **Non-Blocking Network**: Network failures don't prevent sensor operation
 7. **Proper TLS Ordering**: Certificates provisioned before MQTT/HTTPS services start
 
+
+## Boot Coordinator Module
+
+`boot/boot_coordinator.c` centralizes the parallel boot orchestration:
+
+- Creates and owns the system event group so every boot task shares a consistent readiness contract.
+- Prepares `sensor_pipeline_context_t` / `network_boot_config_t` wiring helpers that hide the event bits from feature modules.
+- Launches the high-priority sensor task automatically when provisioning starts (via `boot_coordinator_launch_sensors_async`).
+- Exposes `boot_coordinator_wait_bits()` so `app_main()` only waits on symbolic bits instead of manipulating the event group directly.
+
+This module keeps `main/main.c` focused on sequencing rather than bookkeeping, which was a key goal for Segment 1 of the reorganization plan.
+
+---
+
+## Sensor Pipeline Module
+
+`sensors/pipeline.c` encapsulates the wiring between the boot coordinator and the sensor task so that no other module manages raw `sensor_boot_config_t` structs or event bits directly.
+
+- `sensor_pipeline_prepare()` normalizes the `EventGroupHandle_t`, ready bit, and desired `reading_interval_sec` into a `sensor_pipeline_launch_ctx_t` that is safe to reuse across sync/async launches.
+- `sensor_pipeline_launch()` is a convenience wrapper that calls `sensor_boot_start()` and sets bookkeeping so repeated launches during provisioning are harmless.
+- `sensor_pipeline_launch_async()` lets provisioning callbacks trigger sensors without blocking; the boot coordinator provides this as the callback it hands to the provisioning runner.
+- `sensor_pipeline_snapshot()` / `sensor_pipeline_register_snapshot_listener()` expose a `sensor_pipeline_snapshot_t` structure that bundles sensor readiness bits, current reading interval, and the latest cached telemetry so MQTT + HTTPS code no longer fetches raw state out of `sensor_manager`.
+
+The pipeline is the only place that touches the sensor task’s launch state, which keeps `boot_coordinator.c` declarative and makes future Segment 3 work (shared sensor config headers, telemetry structs) easier to layer on.
+
 ---
 
 ## Phase 0: WiFi Provisioning (First Boot Only)
@@ -58,6 +83,7 @@ If valid WiFi credentials exist in NVS, this phase is **completely skipped** and
 │   ├─ Task runs in parallel during provisioning wait
 │   ├─ Stack: 4KB
 │   └─ Will initialize sensors while waiting for mobile app
+│       └─ Triggered automatically by `boot_coordinator_launch_sensors_async()` when provisioning begins
 │
 ├─ Call idf_provisioning_start()
 ├─ Initialize ESP-IDF provisioning manager
@@ -242,7 +268,8 @@ WHILE USER IS DOING THIS, SENSORS ARE INITIALIZING!
     └─ NETWORK_TASK (Priority 3 - Low)
         ├─ Load credentials from NVS
         ├─ Reconnect to WiFi if needed
-        └─ Continue with cloud provisioning
+    ├─ Continue with cloud provisioning
+    └─ Signals `NETWORK_READY_BIT` via the boot coordinator once services are online
 ```
 
 ---
@@ -390,8 +417,9 @@ Total: 112 seconds (includes failed attempt + reprovisioning)
 
 | File | Purpose |
 |------|---------|
-| `main/idf_provisioning.c/.h` | Wrapper around ESP-IDF provisioning manager |
-| `main/provisioning_state.c/.h` | State machine for tracking provisioning progress |
+| `main/provisioning/provisioning_runner.c/.h` | Entry point that attempts stored credentials, launches BLE provisioning, and provides the reconnection guard |
+| `main/provisioning/idf_provisioning.c/.h` | Wrapper around ESP-IDF provisioning manager |
+| `main/provisioning/provisioning_state.c/.h` | State machine for tracking provisioning progress |
 | `main/wifi_manager.c/.h` | WiFi connection management, NVS storage |
 | `main/reset_button.c/.h` | GPIO button handler for credential clearing |
 | `docs/KOTLIN_INTEGRATION.md` | Mobile app integration guide |
@@ -1006,22 +1034,21 @@ Timing:
 ```c
 [20s+] Runtime Sensor Health Monitoring
 
-For each sensor reading attempt:
-├─ If read succeeds:
-│   ├─ Reset consecutive failure counter
-│   └─ Update sensor cache
-│
-└─ If read fails:
-    ├─ Increment consecutive failure counter
-    ├─ If counter >= 5:
-    │   ├─ Mark sensor as "degraded"
-    │   ├─ Log: "Sensor 0xXX failed 5 times, attempting recovery"
-    │   ├─ Attempt re-initialization (same retry logic)
-    │   └─ If re-init fails:
-    │       ├─ Wait 2 minutes
-    │       └─ Retry re-initialization
-    │
-    └─ Continue with other working sensors (graceful degradation)
+Per-sensor watchdog runs inside sensor_manager:
+├─ Maintain consecutive failure counters + degraded flag per EZO board
+├─ Successful read → reset counter, clear degraded flag, emit
+│   "sensor_recovered | <type>@0xXX read_success" over MQTT status topic (if it was degraded)
+└─ Failed read → increment counter (cached values still served when present)
+  ├─ Counter < 5 → keep running, log warning, no blocking
+  ├─ Counter ≥ 5 → declare degraded once, publish
+  │   "sensor_degraded | <type>@0xXX failures=N"
+  │   ├─ Immediately run re-init sequence (5 tries × 3s)
+  │   ├─ On success → mark healthy + publish
+  │   │   "sensor_recovered | <type>@0xXX reinit_success"
+  │   └─ On failure → publish
+  │       "sensor_recovering | <type>@0xXX cooldown 120000ms" and wait 2 minutes
+  │       before the next automatic attempt
+  └─ Other sensors keep reading the bus the whole time (graceful degradation)
 ```
 
 ---
@@ -1263,37 +1290,41 @@ WebSocket Reconnection:
 
 ## Configuration Constants
 
+### Sensor discovery rules (`sensors/config.h`)
+
 ```c
-// Timing Configuration
-#define I2C_STABILIZATION_DELAY_MS     3000   // Initial wait for sensor power-up
-#define SENSOR_INIT_RETRY_COUNT        5      // Attempts per sensor
-#define SENSOR_INIT_RETRY_DELAY_MS     3000   // Between retry attempts (3 seconds)
-#define SENSOR_INTER_INIT_DELAY_MS     1500   // Between different sensors (1.5 seconds)
-#define WIFI_CONNECT_TIMEOUT_MS        10000  // WiFi connection timeout (10 seconds)
-#define WIFI_RETRY_INTERVAL_MS         30000  // WiFi retry interval (30 seconds)
-#define CLOUD_PROVISION_RETRY_MS       60000  // Cloud provision retry (60 seconds)
-#define SENSOR_CONSECUTIVE_FAIL_LIMIT  5      // Before attempting re-init
-#define SENSOR_RECOVERY_RETRY_MS       120000 // 2 minutes between recovery attempts
+static const uint8_t s_ezo_addresses[] = { 0x16, 0x63, 0x64, 0x66, 0x6F };
 
-// Task Configuration
-#define SENSOR_TASK_STACK_SIZE         4096   // 4KB stack
-#define SENSOR_TASK_PRIORITY           5      // Higher priority - user facing
-#define NETWORK_TASK_STACK_SIZE        8192   // 8KB stack - TLS needs more
-#define NETWORK_TASK_PRIORITY          3      // Lower priority - background
-
-// Event Group Bits for Task Synchronization
-#define SENSORS_READY_BIT              BIT0   // Sensor task completed
-#define NETWORK_READY_BIT              BIT1   // Network task completed
-
-// EZO Sensor I2C Addresses
-static const uint8_t EZO_ADDRESSES[] = {
-    0x16,  // Custom address (user configurable)
-    0x63,  // pH (default)
-    0x64,  // EC - Electrical Conductivity (default)
-    0x66,  // RTD - Temperature (default) ⚠️ ADDED - was missing!
-    0x6F   // HUM - Humidity (default)
+static const sensor_discovery_rules_t s_sensor_discovery_rules = {
+  .ezo_addresses = s_ezo_addresses,
+  .ezo_address_count = sizeof(s_ezo_addresses) / sizeof(s_ezo_addresses[0]),
+  .i2c_stabilization_delay_ms = 3000,
+  .sensor_init_retry_count = 5,
+  .sensor_init_retry_delay_ms = 3000,
+  .sensor_inter_init_delay_ms = 1500,
 };
+```
 
+`sensor_config_get_discovery_rules()` hands these values to both `sensor_boot` (for stabilization + retries) and `sensor_manager` (for address scanning and inter-sensor settling), so the boot coordinator never has to duplicate raw constants again.
+
+### Boot/network timing (`boot/boot_config.h`)
+
+```c
+#define WIFI_CONNECT_TIMEOUT_MS        10000
+#define WIFI_RETRY_INTERVAL_MS         30000
+#define CLOUD_PROVISION_RETRY_MS       60000
+#define NETWORK_READY_WAIT_MS          30000
+#define PROVISIONING_SENSOR_LOG_INTERVAL_MS 10000
+#define WIFI_STORED_CREDENTIAL_WAIT_SEC     30
+
+#define SENSOR_TASK_STACK_SIZE         4096
+#define SENSOR_TASK_PRIORITY           5
+#define NETWORK_TASK_STACK_SIZE        8192
+#define NETWORK_TASK_PRIORITY          3
+
+#define SENSORS_READY_BIT              BIT0
+#define NETWORK_READY_BIT              BIT1
+```
 #define BATTERY_MONITOR_ADDRESS        0x36   // MAX17048
 ```
 
@@ -1529,17 +1560,15 @@ while (!provisioned) {
 **Behavior**:
 
 ```c
-Consecutive failures tracking:
-├─ Reading fails: counter++
-├─ If counter >= 5:
-│   ├─ Log: "Sensor 0xXX failed 5 consecutive times"
-│   ├─ Mark sensor as "degraded"
-│   ├─ Attempt re-initialization (same 5×3s retry logic)
-│   └─ If re-init fails:
-│       ├─ Wait 2 minutes
-│       └─ Retry re-initialization
-│
-└─ Continue with other working sensors
+Per-sensor watchdog flow:
+├─ Every failed read increments counter (cached values still served when possible)
+├─ Counter < 5 → warning log only
+├─ Counter ≥ 5 →
+│   ├─ Mark sensor degraded + publish "sensor_degraded | <type>@0xXX failures=N"
+│   ├─ Attempt re-init (5 tries × 3s)
+│   ├─ Success → publish "sensor_recovered | <type>@0xXX reinit_success"
+│   └─ Failure → publish "sensor_recovering | <type>@0xXX cooldown 120000ms" and back off 2 minutes
+└─ Other sensors continue normally (graceful degradation)
 ```
 
 **Example Timeline**:
@@ -1549,10 +1578,10 @@ T+2s:   pH read fails (timeout)
 T+4s:   pH read fails (timeout)
 T+6s:   pH read fails (timeout)
 T+8s:   pH read fails (timeout)
-T+10s:  pH read fails (timeout) - 5 consecutive failures!
-T+10s:  Log: "pH sensor degraded, attempting recovery"
-T+10s:  Attempt re-init (5 tries × 3s = 15s)
-T+25s:  Re-init successful! Resume normal readings
+T+10s:  5th failure → log + MQTT "sensor_degraded | pH@0x63 failures=5"
+T+10s:  Automatic recovery kicks off (5 tries × 3s)
+T+25s:  Attempt 3 succeeds → MQTT "sensor_recovered | pH@0x63 reinit_success"
+T+27s:  Next scheduled read succeeds, counters reset
 ```
 
 ---

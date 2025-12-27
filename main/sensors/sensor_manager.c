@@ -5,9 +5,10 @@
 
 #include "sensor_manager.h"
 #include "i2c_scanner.h"
-#include "max17048.h"
-#include "ezo_sensor.h"
-#include "mqtt_telemetry.h"
+#include "drivers/max17048.h"
+#include "drivers/ezo_sensor.h"
+#include "services/telemetry/mqtt_telemetry.h"
+#include "sensors/config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -17,6 +18,8 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include <string.h>
+#include <limits.h>
+#include <stddef.h>
 
 static const char *TAG = "SENSOR_MGR";
 
@@ -31,6 +34,15 @@ static uint8_t s_ezo_count = 0;
 #define SENSOR_TRIGGER_DELAY_MS 20
 #define SENSOR_WAIT_STEP_MS 50
 #define SENSOR_MIN_WAIT_MS 750
+#define SENSOR_CONSECUTIVE_FAIL_LIMIT 5
+#define SENSOR_RECOVERY_RETRY_MS 120000
+#define SENSOR_RECOVERY_RETRY_US (SENSOR_RECOVERY_RETRY_MS * 1000ULL)
+#define SENSOR_RECOVERY_INIT_DELAY_MS 3000
+#define SENSOR_RECOVERY_MAX_ATTEMPTS 5
+
+static uint8_t s_consecutive_failures[MAX_EZO_SENSORS] = {0};
+static bool s_sensor_degraded[MAX_EZO_SENSORS] = {0};
+static int64_t s_last_recovery_attempt_us[MAX_EZO_SENSORS] = {0};
 
 // EZO sensor type indices
 static int s_rtd_index = -1;  // Temperature
@@ -74,6 +86,12 @@ static esp_err_t sensor_manager_refresh_settings_internal(void);
 static void sensor_reading_task(void *arg);
 static uint32_t sensor_manager_get_conversion_delay_ms(const ezo_sensor_t *sensor);
 static bool sensor_manager_use_cached_value(uint8_t index, cached_sensor_t *target, uint32_t now_ms);
+static void sensor_manager_reset_health_tracking(void);
+static void sensor_manager_record_success(uint8_t index, const ezo_sensor_t *sensor);
+static void sensor_manager_record_failure(uint8_t index, const ezo_sensor_t *sensor, esp_err_t reason);
+static bool sensor_manager_should_attempt_recovery(uint8_t index);
+static bool sensor_manager_attempt_recovery(uint8_t index, const ezo_sensor_t *sensor);
+static void sensor_manager_publish_health_event(const char *event, const ezo_sensor_t *sensor, const char *detail);
 
 /**
  * @brief Initialize all sensors
@@ -86,6 +104,8 @@ esp_err_t sensor_manager_init(void) {
         ESP_LOGE(TAG, "I2C bus not initialized");
         return ESP_ERR_INVALID_STATE;
     }
+
+    sensor_manager_reset_health_tracking();
     
     // Initialize MAX17048 battery monitor at 0x36
     if (i2c_scanner_device_exists(0x36)) {
@@ -108,17 +128,16 @@ esp_err_t sensor_manager_init(void) {
     
     // Initialize EZO sensors
     // Scan for EZO sensors at known addresses (excluding 0x36 which is MAX17048)
-    uint8_t ezo_addresses[] = {0x16, 0x63, 0x64, 0x66, 0x6F};  // Added 0x66 for RTD
-    
-    for (int i = 0; i < sizeof(ezo_addresses) && s_ezo_count < MAX_EZO_SENSORS; i++) {
-        uint8_t addr = ezo_addresses[i];
-        
-        // Add inter-sensor delay to prevent I2C bus interference
-        // Each sensor takes ~2-3 seconds to initialize, but adding a short gap
-        // between sensors ensures the bus is completely settled
-        if (i > 0) {
-            ESP_LOGI(TAG, "Waiting 500ms before initializing next sensor...");
-            vTaskDelay(pdMS_TO_TICKS(500));
+    const sensor_discovery_rules_t *rules = sensor_config_get_discovery_rules();
+
+    for (size_t i = 0; i < rules->ezo_address_count && s_ezo_count < MAX_EZO_SENSORS; i++) {
+        uint8_t addr = rules->ezo_addresses[i];
+
+        // Allow bus to settle between sensors per discovery rules
+        if (i > 0 && rules->sensor_inter_init_delay_ms > 0) {
+            ESP_LOGI(TAG, "Waiting %lu ms before initializing next sensor...",
+                     (unsigned long)rules->sensor_inter_init_delay_ms);
+            vTaskDelay(pdMS_TO_TICKS(rules->sensor_inter_init_delay_ms));
         }
         
         if (i2c_scanner_device_exists(addr)) {
@@ -194,6 +213,7 @@ esp_err_t sensor_manager_deinit(void) {
     
     // Clear cached readings
     memset(s_cached_readings, 0, sizeof(s_cached_readings));
+    sensor_manager_reset_health_tracking();
     
     ESP_LOGI(TAG, "Sensor manager deinitialized");
     return ESP_OK;
@@ -483,6 +503,155 @@ static bool sensor_manager_use_cached_value(uint8_t index, cached_sensor_t *targ
     return true;
 }
 
+static void sensor_manager_reset_health_tracking(void) {
+    memset(s_consecutive_failures, 0, sizeof(s_consecutive_failures));
+    memset(s_sensor_degraded, 0, sizeof(s_sensor_degraded));
+    memset(s_last_recovery_attempt_us, 0, sizeof(s_last_recovery_attempt_us));
+}
+
+static void sensor_manager_publish_health_event(const char *event, const ezo_sensor_t *sensor, const char *detail) {
+    if (event == NULL || sensor == NULL) {
+        return;
+    }
+
+    if (!mqtt_client_is_connected()) {
+        return;
+    }
+
+    const char *type = (sensor->config.type[0] != '\0') ? sensor->config.type : "UNKNOWN";
+    uint8_t address = sensor->config.i2c_address;
+    char payload[160];
+
+    if (detail != NULL && detail[0] != '\0') {
+        snprintf(payload, sizeof(payload), "%s | %s@0x%02X %s", event, type, address, detail);
+    } else {
+        snprintf(payload, sizeof(payload), "%s | %s@0x%02X", event, type, address);
+    }
+
+    esp_err_t err = mqtt_publish_status(payload);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to publish sensor health event '%s': %s", event, esp_err_to_name(err));
+    }
+}
+
+static void sensor_manager_record_success(uint8_t index, const ezo_sensor_t *sensor) {
+    if (index >= MAX_EZO_SENSORS || sensor == NULL) {
+        return;
+    }
+
+    if (s_consecutive_failures[index] == 0 && !s_sensor_degraded[index]) {
+        return;
+    }
+
+    s_consecutive_failures[index] = 0;
+    if (s_sensor_degraded[index]) {
+        s_sensor_degraded[index] = false;
+        sensor_manager_publish_health_event("sensor_recovered", sensor, "read_success");
+        const char *type = (sensor->config.type[0] != '\0') ? sensor->config.type : "UNKNOWN";
+        ESP_LOGI(TAG, "Sensor %s @0x%02X recovered after transient failures",
+                 type, sensor->config.i2c_address);
+    }
+}
+
+static bool sensor_manager_should_attempt_recovery(uint8_t index) {
+    if (index >= MAX_EZO_SENSORS) {
+        return false;
+    }
+
+    int64_t last_attempt = s_last_recovery_attempt_us[index];
+    if (last_attempt == 0) {
+        return true;
+    }
+
+    int64_t elapsed = esp_timer_get_time() - last_attempt;
+    return elapsed >= SENSOR_RECOVERY_RETRY_US;
+}
+
+static bool sensor_manager_attempt_recovery(uint8_t index, const ezo_sensor_t *sensor_ref) {
+    if (index >= s_ezo_count) {
+        return false;
+    }
+
+    ezo_sensor_t *sensor = &s_ezo_sensors[index];
+    const char *type = (sensor->config.type[0] != '\0') ? sensor->config.type : "UNKNOWN";
+    uint8_t address = sensor->config.i2c_address;
+
+    i2c_master_bus_handle_t bus_handle = i2c_scanner_get_bus_handle();
+    if (bus_handle == NULL) {
+        ESP_LOGE(TAG, "Cannot attempt recovery for %s @0x%02X: I2C bus unavailable", type, address);
+        return false;
+    }
+
+    ESP_LOGW(TAG, "Attempting recovery for sensor %s @0x%02X", type, address);
+    ezo_sensor_deinit(sensor);
+
+    bool recovered = false;
+    for (int attempt = 1; attempt <= SENSOR_RECOVERY_MAX_ATTEMPTS; attempt++) {
+        esp_err_t ret = ezo_sensor_init(sensor, bus_handle, address);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "Sensor %s @0x%02X recovery succeeded (attempt %d/%d)",
+                     type, address, attempt, SENSOR_RECOVERY_MAX_ATTEMPTS);
+            s_consecutive_failures[index] = 0;
+            s_sensor_degraded[index] = false;
+            sensor_manager_publish_health_event("sensor_recovered", sensor, "reinit_success");
+            recovered = true;
+            break;
+        }
+
+        ESP_LOGW(TAG, "Sensor %s @0x%02X recovery attempt %d/%d failed: %s",
+                 type, address, attempt, SENSOR_RECOVERY_MAX_ATTEMPTS, esp_err_to_name(ret));
+        vTaskDelay(pdMS_TO_TICKS(SENSOR_RECOVERY_INIT_DELAY_MS));
+    }
+
+    s_last_recovery_attempt_us[index] = esp_timer_get_time();
+
+    if (!recovered) {
+        char detail[80];
+        snprintf(detail, sizeof(detail), "type=%s addr=0x%02X cooldown %ums",
+             type, address, (unsigned int)SENSOR_RECOVERY_RETRY_MS);
+        sensor_manager_publish_health_event("sensor_recovering", sensor_ref != NULL ? sensor_ref : sensor, detail);
+        ESP_LOGW(TAG, "Sensor %s @0x%02X recovery deferred for %dms",
+                 type, address, (int)SENSOR_RECOVERY_RETRY_MS);
+    }
+
+    return recovered;
+}
+
+static void sensor_manager_record_failure(uint8_t index, const ezo_sensor_t *sensor, esp_err_t reason) {
+    if (index >= MAX_EZO_SENSORS || sensor == NULL) {
+        return;
+    }
+
+    if (s_consecutive_failures[index] < UINT8_MAX) {
+        s_consecutive_failures[index]++;
+    }
+
+    const char *type = (sensor->config.type[0] != '\0') ? sensor->config.type : "UNKNOWN";
+    uint8_t address = sensor->config.i2c_address;
+
+    ESP_LOGW(TAG, "Sensor %s @0x%02X read failed (%s) [%u/%u]",
+             type,
+             address,
+             esp_err_to_name(reason),
+             s_consecutive_failures[index],
+             SENSOR_CONSECUTIVE_FAIL_LIMIT);
+
+    if (s_consecutive_failures[index] >= SENSOR_CONSECUTIVE_FAIL_LIMIT) {
+        if (!s_sensor_degraded[index]) {
+            s_sensor_degraded[index] = true;
+            char detail[80];
+            snprintf(detail, sizeof(detail), "type=%s addr=0x%02X failures=%u",
+                     type, address, s_consecutive_failures[index]);
+            sensor_manager_publish_health_event("sensor_degraded", sensor, detail);
+            ESP_LOGW(TAG, "Sensor %s @0x%02X marked degraded", type, address);
+        }
+
+        if (sensor_manager_should_attempt_recovery(index)) {
+            sensor_manager_attempt_recovery(index, sensor);
+        }
+    }
+}
+
 /**
  * @brief Background sensor reading task
  */
@@ -656,6 +825,7 @@ static void sensor_reading_task(void *arg) {
 
                 uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
                 if (read_ret == ESP_OK) {
+                    sensor_manager_record_success(i, sensor);
                     cached->valid = true;
                     cached_sensor_data_t *slot = &s_cached_readings[i];
                     slot->valid = true;
@@ -673,6 +843,7 @@ static void sensor_reading_task(void *arg) {
                         ESP_LOGD(TAG, "Updated RTD temperature for compensation: %.2f°C", s_last_rtd_temp);
                     }
                 } else {
+                    sensor_manager_record_failure(i, sensor, read_ret);
                     if (!sensor_manager_use_cached_value(i, cached, now_ms)) {
                         cached->valid = false;
                     }

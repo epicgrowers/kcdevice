@@ -5,8 +5,8 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
-#include "sensor_manager.h"
-#include "ezo_sensor.h"
+#include "sensors/sensor_manager.h"
+#include "sensors/drivers/ezo_sensor.h"
 #include "cJSON.h"
 
 typedef struct {

@@ -1,4 +1,4 @@
-#include "idf_provisioning.h"
+#include "provisioning/idf_provisioning.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -11,7 +11,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "provisioning_state.h"
+#include "provisioning/provisioning_state.h"
 #include "wifi_manager.h"
 
 #include "wifi_provisioning/manager.h"

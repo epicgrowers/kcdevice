@@ -9,7 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "cJSON.h"
-#include "ezo_sensor.h"
+#include "sensors/drivers/ezo_sensor.h"
 #include <string.h>
 
 static const char *TAG = "HTTP_WS";
@@ -530,9 +530,9 @@ static void sensor_ws_emit_status_payload(const sensor_cache_t *cache, int targe
 
 static void sensor_ws_send_snapshot_to_client(int fd)
 {
-    sensor_cache_t cache;
-    if (sensor_manager_get_cached_data(&cache) == ESP_OK) {
-        sensor_ws_emit_status_payload(&cache, fd);
+    sensor_pipeline_snapshot_t snapshot = {0};
+    if (sensor_pipeline_snapshot(NULL, &snapshot) == ESP_OK && snapshot.cache_valid) {
+        sensor_ws_emit_status_payload(&snapshot.cache, fd);
     }
 }
 
@@ -878,10 +878,11 @@ esp_err_t sensor_ws_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-void http_websocket_cache_update_handler(const sensor_cache_t *cache, void *ctx)
+void http_websocket_snapshot_handler(const sensor_pipeline_snapshot_t *snapshot, void *ctx)
 {
     (void)ctx;
-    if (cache != NULL) {
-        sensor_ws_emit_status_payload(cache, -1);
+    if (snapshot == NULL || !snapshot->cache_valid) {
+        return;
     }
+    sensor_ws_emit_status_payload(&snapshot->cache, -1);
 }

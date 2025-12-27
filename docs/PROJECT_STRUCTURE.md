@@ -15,12 +15,26 @@ kc_device/
 ├── main/                       # Application source code
 │   ├── CMakeLists.txt         # Main component build configuration
 │   ├── main.c                 # Application entry point and orchestration
-│   ├── idf_provisioning.c     # ESP-IDF provisioning manager wrapper
-│   ├── idf_provisioning.h     # Provisioning helper API
+│   ├── provisioning/          # Provisioning subsystem
+│   │   ├── provisioning_runner.c/.h  # Stored-credential + BLE orchestration
+│   │   ├── idf_provisioning.c/.h     # ESP-IDF provisioning manager wrapper
+│   │   └── provisioning_state.c/.h   # Shared provisioning state machine
+│   ├── sensors/               # Sensor subsystem
+│   │   ├── sensor_boot.c/.h         # Sensor-task launcher + boot glue
+│   │   ├── pipeline.c/.h           # Boot-facing wrapper that launches the sensor task
+│   │   ├── sensor_manager.c/.h      # Aggregates drivers, caches readings
+│   │   └── drivers/
+│   │       ├── ezo_sensor.c/.h      # Atlas Scientific EZO driver helpers
+│   │       └── max17048.c/.h        # MAX17048 battery monitor driver
+│   ├── services/             # Network + cloud services subsystem
+│   │   ├── core/             # services_start()/services_stop() + shared config structs
+│   │   ├── http/             # Dashboard HTTP(S) server, REST handlers, WebSocket streaming
+│   │   ├── telemetry/        # MQTT telemetry clients + future analytics tasks
+│   │   ├── discovery/        # mDNS and LAN service advertisement
+│   │   ├── time_sync/        # SNTP time sync helpers
+│   │   └── keys/             # API key storage and helpers
 │   ├── wifi_manager.c         # WiFi connection and NVS storage
-│   ├── wifi_manager.h         # WiFi manager public API
-│   ├── provisioning_state.c   # State machine implementation
-│   └── provisioning_state.h   # State machine definitions
+│   └── wifi_manager.h         # WiFi manager public API
 │
 ├── config/                     # Configuration files
 │   ├── sdkconfig.defaults     # Default ESP32-S3 configuration
@@ -34,7 +48,8 @@ kc_device/
 │
 ├── test/                       # Test files and examples
 │   ├── test_credentials.json  # Sample credentials for testing
-│   └── test_credentials_examples.txt
+│   ├── test_credentials_examples.txt
+│   └── test_provisioning_state_stub.py  # Host-side provisioning state test scaffolding
 │
 ├── build_s3/                   # ESP32-S3 build artifacts (gitignored)
 │   ├── kc_device.bin
@@ -75,7 +90,39 @@ kc_device/
 
 ---
 
-#### `idf_provisioning.c/h`
+#### `boot/boot_coordinator.c/h`
+**Purpose**: Central boot ownership for shared event groups, sensor/task launches, and readiness waits
+
+**Responsibilities**:
+- Create and own the boot event group used by sensors, network services, and Wi-Fi boot code
+- Provide canonical `sensor_pipeline_launch_ctx_t` / `network_boot_config_t` instances for the respective boot tasks
+- Launch the sensor task idempotently (either during provisioning or afterwards) and expose wait helpers for readiness bits
+
+**Key Functions**:
+- `boot_coordinator_init()` - Allocates the event group and seeds config structs
+- `boot_coordinator_launch_sensor_task()` / `_launch_sensors_async()` - Ensures the sensor task starts exactly once
+- `boot_coordinator_wait_bits()` - Shared wait helper for sensor/network readiness bits
+
+---
+
+#### `provisioning/provisioning_runner.c/h`
+**Purpose**: Single entry point that owns Wi-Fi bring-up regardless of whether credentials already exist.
+
+**Responsibilities**:
+- Attempt stored-credential reconnection before falling back to BLE provisioning.
+- Kick off long-running work (sensor boot) while provisioning waits for user input.
+- Invoke `idf_provisioning_start()` / `_stop()` and translate the result into a concise `provisioning_outcome_t`.
+- Cache credentials and expose `provisioning_connection_guard_poll()` so reconnection logic stays out of `main.c`.
+
+**Key Functions**:
+- `provisioning_run()` - Accepts a `provisioning_plan_t` describing callbacks, event bits, and retry policy.
+- `provisioning_connection_guard_poll()` - Periodically verifies link health and re-issues `wifi_manager_connect()` when needed.
+- `provisioning_get_saved_network()` / `provisioning_clear_saved_network()` / `provisioning_disconnect()` - Public helpers so the rest of the firmware can inspect or clear Wi-Fi state without talking to `wifi_manager` directly.
+- `log_sensor_progress()` (internal) - Mirrors provisioning wait time against sensor readiness for better logs.
+
+---
+
+#### `provisioning/idf_provisioning.c/h`
 **Purpose**: Thin wrapper around ESP-IDF's Wi-Fi provisioning manager
 
 **Responsibilities**:
@@ -124,7 +171,7 @@ kc_device/
 
 ---
 
-#### `provisioning_state.c/h` (127 lines)
+#### `provisioning/provisioning_state.c/h` (127 lines)
 **Purpose**: Provisioning state machine
 
 **States** (8):
@@ -154,6 +201,109 @@ kc_device/
 - `provisioning_state_register_callback()` - Register state change callback
 - `provisioning_state_to_string()` - State to string conversion
 - `provisioning_status_to_string()` - Status code to string conversion
+
+---
+
+#### `sensors/sensor_boot.c/h`
+**Purpose**: Own the dedicated sensor task, coordinating staged initialization during boot.
+
+**Responsibilities**:
+- Delay boot briefly so I2C peripherals stabilize, then run a discovery scan for telemetry logging.
+- Retry `sensor_manager_init()` a configurable number of times before degrading gracefully.
+- Publish readiness bits and summaries back through the boot coordinator/event group.
+
+**Key Functions**:
+- `sensor_boot_start()` / `sensor_boot_configure()` - Register the launch context with the boot coordinator.
+- `sensor_task()` (internal) - Drives I2C scanning, sensor-manager init, and final readiness notification.
+
+---
+
+#### `sensors/pipeline.c/h`
+**Purpose**: Thin orchestration layer that bridges the boot coordinator and the sensor task.
+
+**Responsibilities**:
+- Hold the boot event group, readiness bit, and sampling interval supplied by the coordinator.
+- Provide synchronous and asynchronous launch helpers used during provisioning (so sensor work can start while BLE is active).
+- Track whether the sensor task has already been requested to avoid duplicate launches.
+
+**Key Functions**:
+- `sensor_pipeline_prepare()` - Populate a launch context with event bits + interval metadata.
+- `sensor_pipeline_launch()` / `_launch_async()` - Trigger `sensor_boot_start()` and flip the launched flag when successful.
+
+---
+
+#### `sensors/sensor_manager.c/h`
+**Purpose**: Aggregate all attached sensors (EZO stack + MAX17048) behind one API and maintain cached readings for HTTP/MQTT consumers.
+
+**Responsibilities**:
+- Track all EZO devices discovered on the bus, issue measurement commands, and decode multi-value payloads.
+- Maintain background sampling tasks, pause/resume hooks, and a shared `sensor_cache_t` for dashboards/telemetry.
+- Provide helper reads for temperature, EC, DO, ORP, humidity, and battery voltage/percentage.
+- Surface guard utilities so HTTP handlers can safely pause acquisition while calibrating.
+
+**Key Functions**:
+- `sensor_manager_init()` / `_deinit()` - Discover hardware and start background tasks.
+- `sensor_manager_get_cached_data()` - Return the latest thread-safe snapshot.
+- `sensor_manager_pause_reading()` / `_resume_reading()` - Allow dashboard operations to take exclusive control.
+
+---
+
+#### `sensors/drivers/ezo_sensor.c/h`
+**Purpose**: Low-level Atlas Scientific EZO bus driver with convenience helpers per sensor family (RTD, pH, EC, DO, ORP, HUM).
+
+**Responsibilities**:
+- Issue commands (info, read, name, LED, calibration) over I2C with proper delays.
+- Parse comma-separated responses into typed values and bubble errors up to the manager.
+- Provide compensation hooks so EC/DO readings can leverage RTD temperature data.
+
+**Key Functions**:
+- `ezo_sensor_init()` / `_send_command()` / `_read_response()` - Base driver plumbing.
+- `ezo_sensor_parse_measurement()` - Convert raw strings into floats per sensor type.
+
+---
+
+#### `sensors/drivers/max17048.c/h`
+**Purpose**: MAX17048 Li-Ion fuel-gauge driver used for battery telemetry and health reporting.
+
+**Responsibilities**:
+- Initialize the IC, read version registers, and expose helpers for voltage/percentage reporting.
+- Provide quick-look diagnostics for dashboard + MQTT payloads.
+
+**Key Functions**:
+- `max17048_init()` / `_read_voltage()` / `_read_percentage()` - Hardware accessors.
+- `max17048_get_chip_version()` - Useful for logs and troubleshooting.
+
+---
+
+#### `services/core`
+**Purpose**: Provide the single orchestration surface that boots all network/cloud services once Wi-Fi is online.
+
+**Responsibilities**:
+- Hold shared `services_config_t` / `services_dependencies_t` structs so HTTP, MQTT, mDNS, time sync, and key management operate behind one API.
+- Launch mDNS + HTTPS dashboard services (and, soon, MQTT/time-sync helpers) once TLS assets and Wi-Fi readiness prerequisites are satisfied, while updating the boot event group bit on success.
+- Offer `services_start()` / `services_stop()` entry points plus a status-listener callback so readiness/degradation signals bubble up to the boot coordinator without direct event-group manipulation from each service.
+- Serve as the public include for the entire `services/` namespace; feature-specific directories (`http/`, `telemetry/`, etc.) stay encapsulated.
+
+**Key Functions**:
+- `services_start()` – Accepts configuration + dependencies, spins up mDNS + HTTPS (respecting TLS/time-sync guards), sets the boot ready bit, and emits READY/DEGRADED events for both the core and each component.
+- `services_stop()` – Central stop hook that tears everything down, shuts down HTTP/mDNS if they were running, and emits STOPPED events per component plus a core-level STOPPED signal.
+
+---
+
+#### `services/http`
+**Purpose**: Serve the on-device dashboard over HTTPS, expose REST control endpoints, stream real-time sensor data via WebSocket, and manage the editable web asset volume.
+
+**Responsibilities**:
+- `http_server.c/.h` boot the HTTPS server (skipped on ESP32-C6), register routes, and bridge into the provisioning/sensor subsystems.
+- `http_handlers_sensors.c/.h` implement REST helpers for sensor configuration, calibration, and runtime operations without leaking driver internals.
+- `http_websocket.c/.h` push sensor snapshots + focus streams to live dashboards via `/ws/sensors`.
+- `web_file_editor.c/.h` mount the FATFS-backed `/www` partition, seed defaults, and expose helpers so the dashboard files can be patched over HTTP.
+
+**Key Functions**:
+- `http_server_start()` / `_stop()` – Lifecycle hooks invoked by `services_start()` once TLS assets are in place.
+- `http_handlers_sensors_init()` – Prepares shared mutex/guards so sensor commands can pause the pipeline safely.
+- `sensor_ws_handler()` / `http_websocket_snapshot_handler()` – Broadcast sensor cache updates to dashboard clients.
+- `web_editor_init_fs()` / `_load_file()` – Guarantee the writable dashboard assets exist before HTTP starts.
 
 ---
 
@@ -252,6 +402,13 @@ Multiple credential format examples:
 - Format with special characters in SSID/password
 
 **Note**: These are for development only. Never commit real credentials.
+
+### `test_provisioning_state_stub.py`
+Host-side Python `unittest` skeleton that documents the provisioning state-machine
+scenarios (`stored credentials`, `BLE happy path`, `auth failure`, `connection
+guard`). Each test is currently skipped until the provisioning package exposes
+mockable hooks, but contributors now have a canonical landing zone for future
+assertions.
 
 ---
 
@@ -353,7 +510,7 @@ None - all dependencies are provided by ESP-IDF.
 |------|-------|---------|
 | `main/wifi_manager.c` | 338 | WiFi + NVS |
 | `main/main.c` | 170 | Application entry |
-| `main/provisioning_state.c` | 98 | State machine |
+| `main/provisioning/provisioning_state.c` | 98 | State machine |
 | **Total Source Code** | **~1,250** | |
 | | | |
 | `docs/README.md` | 323 | Main documentation |

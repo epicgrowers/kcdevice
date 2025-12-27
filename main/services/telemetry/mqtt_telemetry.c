@@ -5,9 +5,9 @@
 
 #include "mqtt_telemetry.h"
 #include "cloud_provisioning.h"
-#include "wifi_manager.h"
-#include "sensor_manager.h"
-#include "ezo_sensor.h"
+#include "sensors/sensor_manager.h"
+#include "sensors/pipeline.h"
+#include "sensors/drivers/ezo_sensor.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -206,13 +206,15 @@ static void mqtt_publish_task(void *arg)
             continue;
         }
         
-        // Get cached sensor data from sensor_manager (non-blocking)
-        sensor_cache_t cache;
-        if (sensor_manager_get_cached_data(&cache) != ESP_OK) {
-            ESP_LOGW(TAG, "No cached sensor data available yet");
+        sensor_pipeline_snapshot_t snapshot = {0};
+        if (sensor_pipeline_snapshot(NULL, &snapshot) != ESP_OK || !snapshot.cache_valid) {
+            ESP_LOGW(TAG, "Sensor snapshot unavailable (ready=%d) - delaying publish",
+                     snapshot.readiness.sensors_ready);
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
+
+        const sensor_cache_t *cache = &snapshot.cache;
         
         // Create JSON from cached data
         cJSON *root = cJSON_CreateObject();
@@ -228,8 +230,8 @@ static void mqtt_publish_task(void *arg)
         
         // Add sensors
         cJSON *sensors = cJSON_CreateObject();
-        for (uint8_t i = 0; i < cache.sensor_count && i < 8; i++) {
-            cached_sensor_t *sensor = &cache.sensors[i];
+        for (uint8_t i = 0; i < cache->sensor_count && i < 8; i++) {
+            const cached_sensor_t *sensor = &cache->sensors[i];
             if (!sensor->valid) continue;
             
             if (sensor->value_count == 1) {
@@ -253,14 +255,16 @@ static void mqtt_publish_task(void *arg)
             }
         }
         cJSON_AddItemToObject(root, "sensors", sensors);
+        cJSON_AddBoolToObject(root, "sensors_ready", snapshot.readiness.sensors_ready);
+        cJSON_AddNumberToObject(root, "sensor_interval_sec", snapshot.reading_interval_sec);
         
         // Add battery
-        if (cache.battery_valid) {
-            cJSON_AddNumberToObject(root, "battery", cache.battery_percentage);
+        if (cache->battery_valid) {
+            cJSON_AddNumberToObject(root, "battery", cache->battery_percentage);
         }
         
         // Add RSSI
-        cJSON_AddNumberToObject(root, "rssi", cache.rssi);
+        cJSON_AddNumberToObject(root, "rssi", cache->rssi);
         
         // Serialize and publish
         char *json_str = cJSON_PrintUnformatted(root);

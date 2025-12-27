@@ -6,8 +6,9 @@ This document explains how the firmware provisions Wi-Fi using the ESP-IDF provi
 
 | Layer | File(s) | Responsibility |
 |-------|---------|----------------|
-| Provisioning manager wrapper | `main/idf_provisioning.c/.h` | Starts/stops ESP-IDF's Wi-Fi provisioning manager, selects BLE transport, enforces Security 1 + PoP, bridges callbacks into the local provisioning state machine, and kicks off `wifi_manager_connect()` once credentials arrive. |
-| Provisioning state machine | `main/provisioning_state.c/.h` | Tracks transitions such as *BLE connected*, *credentials received*, *Wi-Fi connecting*, *provisioned*, or *failure*; notifies registered listeners (currently `main.c` logging). |
+| Provisioning runner | `main/provisioning/provisioning_runner.c/.h` | Owns the single `provisioning_run()` call: attempts stored credentials, launches BLE provisioning when required, reports outcomes, and exposes the reconnection guard used by `main.c`. |
+| Provisioning manager wrapper | `main/provisioning/idf_provisioning.c/.h` | Starts/stops ESP-IDF's Wi-Fi provisioning manager, selects BLE transport, enforces Security 1 + PoP, bridges callbacks into the local provisioning state machine, and kicks off Wi-Fi connection attempts once credentials arrive. |
+| Provisioning state machine | `main/provisioning/provisioning_state.c/.h` | Tracks transitions such as *BLE connected*, *credentials received*, *Wi-Fi connecting*, *provisioned*, or *failure*; notifies registered listeners (currently `main.c` logging). |
 | Wi-Fi manager | `main/wifi_manager.c/.h` | Owns the station interface, saves credentials to NVS, retries connections, and exposes helpers to query connection state or clear credentials. |
 | Reset button | `main/reset_button.c/.h` | Short press clears Wi-Fi credentials and restarts; long press performs a factory reset (NVS erase). |
 | Cloud + services | `main/cloud_provisioning.c`, `http_server.c`, `mqtt_telemetry.c`, `sensor_manager.c`, etc. | Idle until Wi-Fi is online, then perform their usual duties (TLS provisioning, HTTPS dashboard, MQTT telemetry, sensor polling). |
@@ -22,13 +23,13 @@ This document explains how the firmware provisions Wi-Fi using the ESP-IDF provi
 
 ### Flow
 
-1. `main.c` boots, initializes security, the reset button, the provisioning state machine, and the Wi-Fi manager.
-2. Stored Wi-Fi credentials (if any) are tested immediately. Success skips provisioning entirely.
-3. On failure/no creds, `idf_provisioning_start()` starts the provisioning manager. BLE advertisements become visible in the ESP BLE Provisioning app.
+1. `main.c` boots, initializes security, the reset button, the provisioning state machine, and builds a `provisioning_plan_t` for the runner.
+2. `provisioning_run()` initializes the Wi-Fi stack and tests stored credentials. Success skips BLE provisioning entirely.
+3. On failure/no creds, `idf_provisioning_start()` starts the provisioning manager. BLE advertisements become visible in the ESP BLE Provisioning app while sensors continue booting.
 4. User selects Security 1, enters the PoP `sumppop`, and supplies SSID/password.
-5. ESP-IDF provisioning manager emits `WIFI_PROV_CRED_RECV`; the wrapper forwards credentials to `wifi_manager_connect()`.
-6. When `wifi_manager` reports `IP_EVENT_STA_GOT_IP`, credentials are saved and provisioning stops (`idf_provisioning_stop()`), freeing BLE resources.
-7. Cloud services start (`start_cloud_services()` in `main.c`).
+5. ESP-IDF provisioning manager emits `WIFI_PROV_CRED_RECV`; the wrapper lets ESP-IDF finish the Wi-Fi connection sequence.
+6. When `wifi_manager` reports `IP_EVENT_STA_GOT_IP`, credentials are saved and provisioning stops (`idf_provisioning_stop()`), freeing BLE resources and seeding the connection guard cache.
+7. Cloud services start (`network_boot_start()`), while `provisioning_connection_guard_poll()` keeps Wi-Fi healthy during normal operation.
 
 ## 2. Provisioning State Machine
 
@@ -71,7 +72,7 @@ graph LR
 ## 5. Extending the System
 
 - **Custom mobile client**: Follow `docs/KOTLIN_INTEGRATION.md` for implementing Security 1 provisioning in Android/Kotlin
-- **Alternate PoP**: Update `kPop` in `main/idf_provisioning.c` and keep the secret synchronized with your provisioning UI
+- **Alternate PoP**: Update `kPop` in `main/provisioning/idf_provisioning.c` and keep the secret synchronized with your provisioning UI
 - **SoftAP provisioning**: The wrapper isolates BLE-specific pieces; swapping to `wifi_prov_scheme_softap` only requires updating the config struct and ensuring menuconfig enables SoftAP transport
 
 ## 6. Logs & Troubleshooting
