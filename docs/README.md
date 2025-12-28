@@ -9,9 +9,9 @@ This document explains how the firmware provisions Wi-Fi using the ESP-IDF provi
 | Provisioning runner | `main/provisioning/provisioning_runner.c/.h` | Owns the single `provisioning_run()` call: attempts stored credentials, launches BLE provisioning when required, reports outcomes, and exposes the reconnection guard used by `main.c`. |
 | Provisioning manager wrapper | `main/provisioning/idf_provisioning.c/.h` | Starts/stops ESP-IDF's Wi-Fi provisioning manager, selects BLE transport, enforces Security 1 + PoP, bridges callbacks into the local provisioning state machine, and kicks off Wi-Fi connection attempts once credentials arrive. |
 | Provisioning state machine | `main/provisioning/provisioning_state.c/.h` | Tracks transitions such as *BLE connected*, *credentials received*, *Wi-Fi connecting*, *provisioned*, or *failure*; notifies registered listeners (currently `main.c` logging). |
-| Wi-Fi manager | `main/wifi_manager.c/.h` | Owns the station interface, saves credentials to NVS, retries connections, and exposes helpers to query connection state or clear credentials. |
+| Wi-Fi manager | `main/provisioning/wifi_manager.c/.h` | Owns the station interface, saves credentials to NVS, retries connections, and exposes helpers to query connection state or clear credentials. |
 | Reset button | `main/reset_button.c/.h` | Short press clears Wi-Fi credentials and restarts; long press performs a factory reset (NVS erase). |
-| Cloud + services | `main/cloud_provisioning.c`, `http_server.c`, `mqtt_telemetry.c`, `sensor_manager.c`, etc. | Idle until Wi-Fi is online, then perform their usual duties (TLS provisioning, HTTPS dashboard, MQTT telemetry, sensor polling). |
+| Cloud + services | `main/services/provisioning/cloud_provisioning.c`, `http_server.c`, `mqtt_telemetry.c`, `sensor_manager.c`, etc. | Idle until Wi-Fi is online, then perform their usual duties (TLS provisioning, HTTPS dashboard, MQTT telemetry, sensor polling). |
 
 ### ESP-IDF Provisioning Manager Configuration
 
@@ -93,3 +93,14 @@ graph LR
 - `WEB_EDITOR_QUICKSTART.md` / `WEB_FILE_EDITOR.md` – HTTPS dashboard customization guides
 
 This documentation intentionally omits the legacy custom GATT service; all provisioning functionality now routes through the ESP-IDF provisioning manager.
+
+## 8. Runtime Config & Key Rotation
+
+Follow this checklist whenever you need to change environment-specific settings or rotate secrets:
+
+1. **Edit runtime config**: Update `config/runtime/services.json` for feature toggles (HTTP, MQTT, mDNS, time-sync) and `config/runtime/api_keys.json` for dashboard/cloud API keys. Never commit production secrets; keep the checked-in file with placeholders and apply real values in your private branch.
+2. **Rebuild the firmware**: `build.ps1 -Target s3 -Action build` (or `-Target c6`) embeds the JSON blobs via `EMBED_TXTFILES`. A rebuild is required every time either file changes.
+3. **Clear stale secrets**: Long-press the BOOT button for a factory reset or run `idf.py erase_flash` so encrypted NVS is wiped. On next boot the API key manager reseeds from the embedded JSON before cloud provisioning runs.
+4. **Flash + verify**: Flash the new binary, open the monitor, and confirm that `API_KEY_MGR` logs “seeded from runtime config” before services start. Provision Wi-Fi if needed, then ensure HTTPS/MQTT start without “Cloud API key unavailable” errors.
+
+This flow keeps secrets in a single encrypted store (NVS) while still allowing per-environment overrides without code changes.

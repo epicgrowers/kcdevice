@@ -18,7 +18,8 @@ kc_device/
 │   ├── provisioning/          # Provisioning subsystem
 │   │   ├── provisioning_runner.c/.h  # Stored-credential + BLE orchestration
 │   │   ├── idf_provisioning.c/.h     # ESP-IDF provisioning manager wrapper
-│   │   └── provisioning_state.c/.h   # Shared provisioning state machine
+│   │   ├── provisioning_state.c/.h   # Shared provisioning state machine
+│   │   └── wifi_manager.c/.h         # WiFi connection and NVS storage
 │   ├── sensors/               # Sensor subsystem
 │   │   ├── sensor_boot.c/.h         # Sensor-task launcher + boot glue
 │   │   ├── pipeline.c/.h           # Boot-facing wrapper that launches the sensor task
@@ -33,10 +34,9 @@ kc_device/
 │   │   ├── discovery/        # mDNS and LAN service advertisement
 │   │   ├── time_sync/        # SNTP time sync helpers
 │   │   └── keys/             # API key storage and helpers
-│   ├── wifi_manager.c         # WiFi connection and NVS storage
-│   └── wifi_manager.h         # WiFi manager public API
 │
 ├── config/                     # Configuration files
+│   ├── runtime/               # Embedded JSON/TOML overrides consumed at boot
 │   ├── sdkconfig.defaults     # Default ESP32-S3 configuration
 │   ├── sdkconfig.esp32c6      # Default ESP32-C6 configuration
 │   └── partitions.csv         # Flash partition table
@@ -145,7 +145,7 @@ kc_device/
 
 ---
 
-#### `wifi_manager.c/h` (338 lines)
+#### `provisioning/wifi_manager.c/h` (338 lines)
 **Purpose**: WiFi connection lifecycle management
 
 **Responsibilities**:
@@ -300,7 +300,7 @@ kc_device/
 - `web_file_editor.c/.h` mount the FATFS-backed `/www` partition, seed defaults, and expose helpers so the dashboard files can be patched over HTTP.
 
 **Key Functions**:
-- `http_server_start()` / `_stop()` – Lifecycle hooks invoked by `services_start()` once TLS assets are in place.
+- `http_server_start(const http_server_config_t *)` / `_stop()` – Lifecycle hooks invoked by `services_start()` once TLS assets are in place.
 - `http_handlers_sensors_init()` – Prepares shared mutex/guards so sensor commands can pause the pipeline safely.
 - `sensor_ws_handler()` / `http_websocket_snapshot_handler()` – Broadcast sensor cache updates to dashboard clients.
 - `web_editor_init_fs()` / `_load_file()` – Guarantee the writable dashboard assets exist before HTTP starts.
@@ -349,6 +349,63 @@ factory,     app,     factory, 0x10000, 0x300000,
 - **nvs** (24 KB): Non-Volatile Storage for WiFi credentials
 - **phy_init** (4 KB): RF calibration data
 - **factory** (3 MB): Application firmware
+
+### `runtime/services.json`
+Embedded JSON file consumed by `config/runtime_config.c` at boot. The contents are
+compiled into the firmware via `EMBED_TXTFILES`, so editing the file requires a
+rebuild. Supported fields:
+
+```json
+{
+  "services": {
+    "enable_http_server": true,
+    "enable_mqtt": true,
+    "enable_mdns": true,
+    "enable_time_sync": true,
+    "https_port": 443
+  },
+  "mqtt": {
+    "broker_uri": "mqtts://mqtt.kannacloud.com:8883",
+    "username": "sensor01",
+    "password": "xkKKYQWxiT83Ni3",
+    "publish_interval_sec": 0
+  },
+  "dashboard": {
+    "mdns_hostname": "kc",
+    "mdns_instance_name": "KannaCloud Device"
+  },
+  "time_sync": {
+    "timezone": "UTC",
+    "timeout_sec": 10
+  }
+}
+```
+
+`runtime_config_apply_services_overrides()` parses the JSON once, caches the
+results, and mutates `services_config_t` before the services core launches. Any
+missing fields fall back to the defaults in `services/core/services_config.c`.
+
+### `runtime/api_keys.json`
+Companion JSON file embedded next to `services.json`. Parsed by
+`services/keys/api_key_manager.c` on boot; if encrypted NVS does not already hold
+API keys, the manager seeds entries from this file and stores them securely.
+
+```json
+{
+  "api_keys": [
+    {
+      "name": "Cloud Provisioning Key",
+      "type": "cloud",
+      "value": "REPLACE_WITH_PROVISIONING_KEY",
+      "enabled": true
+    }
+  ]
+}
+```
+
+Supported `type` values: `cloud`, `dashboard`, or `custom` (default). Keep the
+checked-in value as a placeholder—real keys should be supplied in private builds
+so they enter NVS during the first boot.
 
 ---
 
@@ -508,7 +565,7 @@ None - all dependencies are provided by ESP-IDF.
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `main/wifi_manager.c` | 338 | WiFi + NVS |
+| `main/provisioning/wifi_manager.c` | 338 | WiFi + NVS |
 | `main/main.c` | 170 | Application entry |
 | `main/provisioning/provisioning_state.c` | 98 | State machine |
 | **Total Source Code** | **~1,250** | |

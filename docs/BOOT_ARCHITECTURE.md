@@ -274,6 +274,50 @@ WHILE USER IS DOING THIS, SENSORS ARE INITIALIZING!
 
 ---
 
+### Services Event Flow & Ready Bits
+
+Once TLS assets exist, `network_task` seeds a `services_config_t` via
+`services_config_load_defaults()`, flips the runtime toggles (TLS ready, HTTP/mDNS enablement,
+time-sync callback), and hands the structure to `services_start()`. The services core then:
+
+- Emits `SERVICES_EVENT_STARTING` for the core and each component (HTTP, mDNS, MQTT, time sync)
+  so the boot log shows the launch order.
+- Emits `SERVICES_EVENT_READY` or `SERVICES_EVENT_DEGRADED` per component; the listener inside
+  `network_task` records booleans that eventually feed the MQTT status payload
+  (`tls=ready ntp=synced mqtt=ready https=enabled`).
+- Calls `xEventGroupSetBits()` on the boot coordinator’s event group once at least one service
+  is running (or every optional service was intentionally disabled). This is what ultimately
+  flips `NETWORK_READY_BIT` for `app_main()`.
+- Keeps the core flagged as degraded whenever a component reports `SERVICES_EVENT_DEGRADED`. We
+  still assert `NETWORK_READY_BIT`, but the MQTT/console summaries point out which pieces are
+  pending or degraded so watchdogs can decide whether to retry, reboot, or stay sensor-only.
+
+#### Ready vs. Degraded Event Bits
+
+```
+Boot Event Group (boot_coordinator)
+├─ BIT0 -> SENSORS_READY_BIT     (set by sensors/pipeline once readings are stable)
+├─ BIT1 -> NETWORK_READY_BIT     (set by services/core after at least one cloud service starts)
+└─ BIT2 -> NETWORK_DEGRADED_BIT  (set by services/core the moment any component reports DEGRADED)
+```
+
+- `services_dependencies_t` now carries both bits plus an optional fault callback. When
+  `services_start()` emits `SERVICES_EVENT_DEGRADED`, the core sets `NETWORK_DEGRADED_BIT` and
+  invokes the callback so higher-level code can broadcast safe-mode telemetry.
+- `boot_coordinator_configure_network_boot()` wires both bits into `network_task`, and
+  `app_main()` waits on `NETWORK_READY_BIT | NETWORK_DEGRADED_BIT`. The first bit to fire ends the
+  wait: a ready signal continues the normal boot, while a degraded signal lets the device skip the
+  remaining wait and fall back to sensor-only / limited network mode.
+- Degraded bits are latched until `services_stop()` clears them, so once a fault is detected the
+  boot monitor and CLI can continue to warn operators even if other services keep running.
+- The optional fault callback in `network_task` publishes a compact `network_fault` status via
+  `boot_monitor_publish()`, keeping OTA logs aligned with what the event bits reported.
+
+This lifecycle keeps every network/cloud detail inside `main/services/…` while preserving the
+single event-bit contract that the boot coordinator and `app_main()` rely on.
+
+---
+
 ### Provisioning State Machine
 
 ```mermaid
@@ -420,7 +464,7 @@ Total: 112 seconds (includes failed attempt + reprovisioning)
 | `main/provisioning/provisioning_runner.c/.h` | Entry point that attempts stored credentials, launches BLE provisioning, and provides the reconnection guard |
 | `main/provisioning/idf_provisioning.c/.h` | Wrapper around ESP-IDF provisioning manager |
 | `main/provisioning/provisioning_state.c/.h` | State machine for tracking provisioning progress |
-| `main/wifi_manager.c/.h` | WiFi connection management, NVS storage |
+| `main/provisioning/wifi_manager.c/.h` | WiFi connection management, NVS storage |
 | `main/reset_button.c/.h` | GPIO button handler for credential clearing |
 | `docs/KOTLIN_INTEGRATION.md` | Mobile app integration guide |
 | `docs/README.md` | Detailed provisioning architecture |

@@ -17,7 +17,7 @@ Secure Wi-Fi provisioning firmware for ESP32-S3 and ESP32-C6 chips based on the 
   - BLE transport with Espressif's provisioning schemas and characteristic layout handled by the framework
   - Security 1 (X25519 + PoP) handshake with shared password `sumppop`
   - Automatic teardown of BLE resources when Wi-Fi connects
-- **Wi-Fi Manager** (`main/wifi_manager.c/.h`)
+- **Wi-Fi Manager** (`main/provisioning/wifi_manager.c/.h`)
   - Stores credentials securely in NVS after a successful DHCP lease
   - Handles reconnect logic, retry timers, and credential clearing
 - **Provisioning State Machine** (`main/provisioning/provisioning_state.c/.h`)
@@ -37,7 +37,7 @@ main/
     provisioning_runner.c/.h  # Stored creds + BLE provisioning surface
     idf_provisioning.c/.h     # ESP-IDF provisioning manager wrapper
     provisioning_state.c/.h   # Shared provisioning state machine
-  wifi_manager.c/.h           # Wi-Fi + NVS logic
+    wifi_manager.c/.h         # Wi-Fi + NVS logic
   reset_button.c/.h           # GPIO0 short/long press handling
   ...                         # Cloud, HTTP, MQTT, sensors, etc.
 config/
