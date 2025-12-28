@@ -3,7 +3,7 @@
  * @brief mDNS service implementation
  */
 
-#include "mdns_service.h"
+#include "services/discovery/mdns_service.h"
 #include "esp_log.h"
 
 static const char *TAG = "MDNS";

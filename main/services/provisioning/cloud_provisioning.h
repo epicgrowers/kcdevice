@@ -20,7 +20,6 @@ extern "C" {
 
 // Configuration
 #define CLOUD_PROV_SSL_MANAGER_URL "https://ssl.kannacloud.com"
-#define CLOUD_PROV_API_KEY "sk_sgpGxk29Bl4rDDoNqIzrD9tdHdwD7KcieteAoSEOH78"  // TODO: Replace with your actual API key
 
 // Device certificate info
 #define CLOUD_PROV_MAX_CERT_SIZE (4096)

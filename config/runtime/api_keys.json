@@ -1,0 +1,10 @@
+{
+  "api_keys": [
+    {
+      "name": "Cloud Provisioning Key",
+      "type": "cloud",
+      "value": "sk_sgpGxk29Bl4rDDoNqIzrD9tdHdwD7KcieteAoSEOH78",
+      "enabled": true
+    }
+  ]
+}

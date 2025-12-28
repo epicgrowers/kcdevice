@@ -3,8 +3,7 @@
  * @brief mDNS service for local network discovery
  */
 
-#ifndef MDNS_SERVICE_H
-#define MDNS_SERVICE_H
+#pragma once
 
 #include "esp_err.h"
 
@@ -14,7 +13,7 @@ extern "C" {
 
 /**
  * @brief Initialize mDNS service
- * 
+ *
  * @param hostname Hostname for mDNS (e.g., "kc" for kc.local)
  * @param instance_name Instance name for service description
  * @return ESP_OK on success
@@ -23,7 +22,7 @@ esp_err_t mdns_service_init(const char *hostname, const char *instance_name);
 
 /**
  * @brief Add HTTPS service to mDNS
- * 
+ *
  * @param port HTTPS port (default 443)
  * @return ESP_OK on success
  */
@@ -37,5 +36,3 @@ void mdns_service_deinit(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif // MDNS_SERVICE_H

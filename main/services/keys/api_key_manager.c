@@ -3,12 +3,14 @@
  * @brief API key management implementation
  */
 
-#include "api_key_manager.h"
+#include "services/keys/api_key_manager.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_random.h"
+#include "cJSON.h"
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 static const char *TAG = "API_KEY_MGR";
@@ -22,6 +24,13 @@ static const char *TAG = "API_KEY_MGR";
 static api_key_t s_api_keys[API_KEY_MAX_COUNT];
 static size_t s_key_count = 0;
 static bool s_initialized = false;
+
+extern const uint8_t config_runtime_api_keys_json_start[] asm("_binary_api_keys_json_start");
+extern const uint8_t config_runtime_api_keys_json_end[] asm("_binary_api_keys_json_end");
+
+static esp_err_t api_key_manager_add_entry(const char *name, const char *key, api_key_type_t type, bool enabled);
+static esp_err_t seed_keys_from_embedded_config(void);
+static api_key_type_t parse_api_key_type(const char *type_str);
 
 // Helper function to save keys to NVS
 static esp_err_t save_keys_to_nvs(void)
@@ -113,6 +122,131 @@ static esp_err_t load_keys_from_nvs(void)
     return ESP_OK;
 }
 
+static api_key_type_t parse_api_key_type(const char *type_str)
+{
+    if (type_str == NULL) {
+        return API_KEY_TYPE_CUSTOM;
+    }
+
+    if (strcasecmp(type_str, "cloud") == 0 || strcasecmp(type_str, "cloud_server") == 0) {
+        return API_KEY_TYPE_CLOUD_SERVER;
+    }
+
+    if (strcasecmp(type_str, "dashboard") == 0 || strcasecmp(type_str, "local_dashboard") == 0) {
+        return API_KEY_TYPE_LOCAL_DASHBOARD;
+    }
+
+    return API_KEY_TYPE_CUSTOM;
+}
+
+static esp_err_t api_key_manager_add_entry(const char *name, const char *key, api_key_type_t type, bool enabled)
+{
+    if (name == NULL || key == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (s_key_count >= API_KEY_MAX_COUNT) {
+        ESP_LOGE(TAG, "Maximum API key count reached");
+        return ESP_ERR_NO_MEM;
+    }
+
+    for (size_t i = 0; i < s_key_count; i++) {
+        if (strcmp(s_api_keys[i].name, name) == 0) {
+            ESP_LOGW(TAG, "API key with name '%s' already exists", name);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    api_key_t new_key = {0};
+    strncpy(new_key.name, name, API_KEY_NAME_MAX_LENGTH - 1);
+    strncpy(new_key.key, key, API_KEY_MAX_LENGTH - 1);
+    new_key.type = type;
+    new_key.enabled = enabled;
+    new_key.created_timestamp = (uint32_t)time(NULL);
+    new_key.last_used_timestamp = 0;
+    new_key.use_count = 0;
+
+    s_api_keys[s_key_count] = new_key;
+    s_key_count++;
+
+    esp_err_t err = save_keys_to_nvs();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Added API key '%s' (type: %d)", name, type);
+    }
+
+    return err;
+}
+
+static esp_err_t seed_keys_from_embedded_config(void)
+{
+    const uint8_t *start = config_runtime_api_keys_json_start;
+    const uint8_t *end = config_runtime_api_keys_json_end;
+    size_t length = (size_t)(end - start);
+
+    if (length == 0) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    cJSON *root = cJSON_ParseWithLength((const char *)start, length);
+    if (root == NULL) {
+        ESP_LOGW(TAG, "Failed to parse config/runtime/api_keys.json");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    cJSON *keys = cJSON_GetObjectItemCaseSensitive(root, "api_keys");
+    if (!cJSON_IsArray(keys)) {
+        cJSON_Delete(root);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    size_t added = 0;
+    cJSON *entry = NULL;
+    cJSON_ArrayForEach(entry, keys) {
+        cJSON *name = cJSON_GetObjectItemCaseSensitive(entry, "name");
+        cJSON *value = cJSON_GetObjectItemCaseSensitive(entry, "value");
+        if (!cJSON_IsString(name) || !cJSON_IsString(value) ||
+            name->valuestring == NULL || value->valuestring == NULL) {
+            continue;
+        }
+
+        if (strlen(value->valuestring) == 0 ||
+            strcmp(value->valuestring, "REPLACE_WITH_PROVISIONING_KEY") == 0) {
+            ESP_LOGW(TAG, "Skipping bootstrap key '%s' with placeholder value", name->valuestring);
+            continue;
+        }
+
+        api_key_type_t type = API_KEY_TYPE_CUSTOM;
+        cJSON *type_item = cJSON_GetObjectItemCaseSensitive(entry, "type");
+        if (cJSON_IsString(type_item) && type_item->valuestring != NULL) {
+            type = parse_api_key_type(type_item->valuestring);
+        }
+
+        bool enabled = true;
+        cJSON *enabled_item = cJSON_GetObjectItemCaseSensitive(entry, "enabled");
+        if (cJSON_IsBool(enabled_item)) {
+            enabled = cJSON_IsTrue(enabled_item);
+        }
+
+        esp_err_t err = api_key_manager_add_entry(name->valuestring, value->valuestring, type, enabled);
+        if (err == ESP_OK) {
+            added++;
+        } else if (err == ESP_ERR_INVALID_ARG) {
+            ESP_LOGW(TAG, "Bootstrap API key '%s' already exists, skipping", name->valuestring);
+        } else {
+            ESP_LOGE(TAG, "Failed to seed API key '%s': %s", name->valuestring, esp_err_to_name(err));
+        }
+    }
+
+    cJSON_Delete(root);
+
+    if (added == 0) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    ESP_LOGI(TAG, "Seeded %zu API keys from runtime config", added);
+    return ESP_OK;
+}
+
 esp_err_t api_key_manager_init(void)
 {
     if (s_initialized) {
@@ -132,6 +266,18 @@ esp_err_t api_key_manager_init(void)
         ESP_LOGE(TAG, "Failed to load keys from NVS");
         return err;
     }
+
+    if (s_key_count == 0) {
+        esp_err_t seed_err = seed_keys_from_embedded_config();
+        if (seed_err == ESP_OK) {
+            ESP_LOGI(TAG, "API key manager seeded from runtime config");
+        } else if (seed_err == ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "No bootstrap API keys found; update config/runtime/api_keys.json if cloud services require authentication");
+        } else {
+            ESP_LOGE(TAG, "Failed to seed API keys: %s", esp_err_to_name(seed_err));
+            return seed_err;
+        }
+    }
     
     s_initialized = true;
     ESP_LOGI(TAG, "API key manager initialized with %zu keys", s_key_count);
@@ -146,44 +292,7 @@ esp_err_t api_key_manager_add(const char *name, const char *key, api_key_type_t 
         return ESP_ERR_INVALID_STATE;
     }
     
-    if (name == NULL || key == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    if (s_key_count >= API_KEY_MAX_COUNT) {
-        ESP_LOGE(TAG, "Maximum API key count reached");
-        return ESP_ERR_NO_MEM;
-    }
-    
-    // Check if key name already exists
-    for (size_t i = 0; i < s_key_count; i++) {
-        if (strcmp(s_api_keys[i].name, name) == 0) {
-            ESP_LOGW(TAG, "API key with name '%s' already exists", name);
-            return ESP_ERR_INVALID_ARG;
-        }
-    }
-    
-    // Create new key
-    api_key_t new_key = {0};
-    strncpy(new_key.name, name, API_KEY_NAME_MAX_LENGTH - 1);
-    strncpy(new_key.key, key, API_KEY_MAX_LENGTH - 1);
-    new_key.type = type;
-    new_key.enabled = true;
-    new_key.created_timestamp = (uint32_t)time(NULL);
-    new_key.last_used_timestamp = 0;
-    new_key.use_count = 0;
-    
-    // Add to array
-    s_api_keys[s_key_count] = new_key;
-    s_key_count++;
-    
-    // Save to NVS
-    esp_err_t err = save_keys_to_nvs();
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Added API key '%s' (type: %d)", name, type);
-    }
-    
-    return err;
+    return api_key_manager_add_entry(name, key, type, true);
 }
 
 esp_err_t api_key_manager_delete(const char *name)

@@ -13,6 +13,10 @@ This document tracks the ongoing effort to reshape the KC-Device firmware into c
 - Added `sensors/pipeline.{c,h}` and rewired the boot coordinator/main flow to launch sensors exclusively through the pipeline context so provisioning and stored-credential boots share the same entry point.
 - Extracted provisioning/logging callbacks to `boot/boot_handlers.*` and trimmed `main/main.c` to 184 lines so it only wires modules together.
 - Added `provisioning_run()`/`provisioning_connection_guard_poll()` so all Wi-Fi lifecycle logic lives behind the provisioning package and documentation now reflects the new directory layout.
+- Moved the mDNS service and API key manager into `services/discovery/` and `services/keys/` so every Segment 4 subtree now lives under the services namespace alongside the existing HTTP, telemetry, and time-sync modules.
+- Created `config/runtime/` with an embedded `services.json` plus a `runtime_config` loader so network boot consumes environment-specific overrides before launching the services core.
+- Relocated `wifi_manager.c/.h` into the provisioning package (`main/provisioning/`) so the entire stored-credential and reconnection flow stays encapsulated with the rest of the provisioning stack.
+- Routed TLS certificates, MQTT CA blobs, and device metadata through a new `services_provisioning_api_t` so only `network_boot.c` touches `cloud_provisioning`, while HTTP + MQTT modules receive everything via `services_config_t`.
 
 ## Guiding Principles
 
@@ -70,18 +74,21 @@ _Status 2025-12-27_: **Completed** – sensor drivers, boot helpers, and the new
 
 **Goal**: Consolidate HTTP, MQTT, API keys, mDNS, and time sync under a `services/` (or `cloud/`) namespace with lifecycle hooks.
 
+_Status 2025-12-27_: **Completed** – `services_config_t` now carries a provisioning/provider interface so HTTP + MQTT load TLS assets without touching `cloud_provisioning`, and `services_start()` drives every service plus the degraded/fault callbacks.
+
 **Tasks**:
-- [started] Carve out a `services/` tree:
+- [done] Carve out a `services/` tree:
 	- `services/core/` (new `services.h`, `services_start()/services_stop()`, config structs, readiness bits)
 	- `services/http/` (existing `http_server`, `http_handlers_sensors`, `http_websocket`, `web_file_editor`)
 	- `services/telemetry/` (`mqtt_telemetry` and future telemetry workers)
 	- `services/discovery/` (`mdns_service`, future DNS-SD helpers)
 	- `services/time_sync/` (`time_sync.c`)
 	- `services/keys/` (`api_key_manager.c`)
+	- `services/provisioning/` (`cloud_provisioning.c` for TLS assets and device metadata)
 - [done] Move the HTTP server, handlers, WebSocket, and web file editor sources underneath `services/http/` and update the build/doc references.
-- [started] Define `services_config_t` with TLS cert refs, MQTT interval, dashboard enable flags, and pass it from the boot flow (currently `network_boot.c`).
-- [started] Implement `services_start(const services_config_t *, const services_dependencies_t *, services_status_listener_t cb)` that launches HTTP/MQTT/time sync once Wi-Fi ready and updates the boot event group (HTTP + mDNS now run through `services_start()`).
-- Add degradation callbacks so failures bubble to boot coordinator for retries or safe-mode decisions.
+- [done] Define `services_config_t` with TLS cert refs, MQTT interval, dashboard enable flags, and pass it from the boot flow (currently `network_boot.c`). The new `services_provisioning_api_t` wraps `cloud_provisioning` so modules receive TLS/device metadata via config instead of direct includes.
+- [done] Implement `services_start(const services_config_t *, const services_dependencies_t *, services_status_listener_t cb)` that launches HTTP/MQTT/time sync once Wi-Fi ready and updates the boot event group (HTTP + mDNS now run through `services_start()`). HTTP + MQTT now receive typed config structs and refuse to start if provisioning hooks are missing.
+- [done] Add degradation callbacks so failures bubble to boot coordinator for retries or safe-mode decisions (`services_fault_handler_t` latches `NETWORK_DEGRADED_BIT` and publishes `network_fault`).
 
 **Deliverables**:
 - `services/README.md` explaining responsibilities + dependencies.
@@ -89,11 +96,13 @@ _Status 2025-12-27_: **Completed** – sensor drivers, boot helpers, and the new
 
 ### Segment 5 – Configuration + Secrets Hygiene
 
+_Status 2025-12-27_: **In progress** – runtime overrides now live in `config/runtime/services.json`, `config/runtime/api_keys.json` seeds the encrypted secret store, and `network_boot.c` applies overrides at boot while we finish build validation.
+
 **Goal**: Untangle configuration values from source files and ensure secrets are pluggable per environment.
 
 **Tasks**:
-- Create `config/runtime/` for JSON/TOML describing sensors, endpoints, certificates, etc., and load them at boot.
-- Ensure `api_key_manager` pulls from a single secret store (NVS key or secure element) instead of hard-coded constants.
+- [done] Create `config/runtime/` for JSON/TOML describing sensors, endpoints, certificates, etc., and load them at boot.
+- [done] Ensure `api_key_manager` pulls from a single secret store (encrypted NVS seeded via `config/runtime/api_keys.json`) instead of hard-coded constants.
 - Expand `build.ps1` to validate required configs (e.g., fail early if certificates are missing for HTTPS dashboard).
 
 **Deliverables**:

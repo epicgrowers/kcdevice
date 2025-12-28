@@ -1,0 +1,23 @@
+{
+  "services": {
+    "enable_http_server": true,
+    "enable_mqtt": true,
+    "enable_mdns": true,
+    "enable_time_sync": true,
+    "https_port": 443
+  },
+  "mqtt": {
+    "broker_uri": "mqtts://mqtt.kannacloud.com:8883",
+    "username": "sensor01",
+    "password": "xkKKYQWxiT83Ni3",
+    "publish_interval_sec": 0
+  },
+  "dashboard": {
+    "mdns_hostname": "kc",
+    "mdns_instance_name": "KannaCloud Device"
+  },
+  "time_sync": {
+    "timezone": "UTC",
+    "timeout_sec": 10
+  }
+}

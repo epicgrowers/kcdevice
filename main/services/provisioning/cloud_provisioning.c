@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_mac.h"
+#include "services/keys/api_key_manager.h"
 #include <string.h>
 
 static const char *TAG = "CLOUD_PROV";
@@ -65,6 +66,29 @@ static void get_device_mac_string(char *mac_str, size_t len)
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     snprintf(mac_str, len, "%02x%02x%02x%02x%02x%02x",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+static esp_err_t attach_cloud_api_key_header(esp_http_client_handle_t client)
+{
+    api_key_t cloud_key;
+    esp_err_t err = api_key_manager_get_by_type(API_KEY_TYPE_CLOUD_SERVER, &cloud_key);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Cloud API key unavailable: %s", esp_err_to_name(err));
+        ESP_LOGI(TAG, "Update config/runtime/api_keys.json and reboot to seed the secret");
+        return err;
+    }
+
+    if (cloud_key.key[0] == '\0') {
+        ESP_LOGE(TAG, "Cloud API key is empty; update config/runtime/api_keys.json");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    err = esp_http_client_set_header(client, "X-API-Key", cloud_key.key);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set API key header: %s", esp_err_to_name(err));
+    }
+
+    return err;
 }
 
 esp_err_t cloud_prov_init(cloud_prov_callback_t callback)
@@ -428,9 +452,13 @@ static esp_err_t request_certificate_generation(char *cert_id_out, size_t cert_i
         ESP_LOGE(TAG, "Failed to initialize HTTP client");
         return ESP_FAIL;
     }
-    
-    // Set headers
-    esp_http_client_set_header(client, "X-API-Key", CLOUD_PROV_API_KEY);
+
+    esp_err_t err = attach_cloud_api_key_header(client);
+    if (err != ESP_OK) {
+        esp_http_client_cleanup(client);
+        return err;
+    }
+
     esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
@@ -440,7 +468,7 @@ static esp_err_t request_certificate_generation(char *cert_id_out, size_t cert_i
     memset(s_response_buffer, 0, sizeof(s_response_buffer));
     
     // Perform request
-    esp_err_t err = esp_http_client_perform(client);
+    err = esp_http_client_perform(client);
     int status_code = esp_http_client_get_status_code(client);
     
     esp_http_client_cleanup(client);
@@ -504,13 +532,17 @@ static esp_err_t download_file(const char *cert_id, const char *file_type, char 
         return ESP_FAIL;
     }
     
-    esp_http_client_set_header(client, "X-API-Key", CLOUD_PROV_API_KEY);
+    esp_err_t err = attach_cloud_api_key_header(client);
+    if (err != ESP_OK) {
+        esp_http_client_cleanup(client);
+        return err;
+    }
     
     // Reset response buffer
     s_response_len = 0;
     memset(s_response_buffer, 0, sizeof(s_response_buffer));
     
-    esp_err_t err = esp_http_client_perform(client);
+    err = esp_http_client_perform(client);
     int status_code = esp_http_client_get_status_code(client);
     
     ESP_LOGI(TAG, "Download response - Status: %d, Length: %zu bytes", status_code, s_response_len);
