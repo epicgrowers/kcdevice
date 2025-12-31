@@ -9,8 +9,13 @@
   "mqtt": {
     "broker_uri": "mqtts://mqtt.kannacloud.com:8883",
     "username": "sensor01",
-    "password": "xkKKYQWxiT83Ni3",
-    "publish_interval_sec": 0
+    "password": "xkKKYQWxiT83Ni3"
+  },
+  "telemetry": {
+    "publish_interval_sec": 0,
+    "busy_backoff_ms": 1000,
+    "client_backoff_ms": 750,
+    "idle_delay_ms": 200
   },
   "dashboard": {
     "mdns_hostname": "kc",
@@ -18,6 +23,8 @@
   },
   "time_sync": {
     "timezone": "UTC",
-    "timeout_sec": 10
+    "timeout_sec": 30,
+    "retry_attempts": 2,
+    "retry_delay_sec": 15
   }
 }

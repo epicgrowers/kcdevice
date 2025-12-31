@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "kc_device",
-    "project_version":    "c7e8deb-dirty",
+    "project_version":    "c342441-dirty",
     "project_path":       "C:/Code/kc_device",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5.1-2",
     "build_dir":          "C:/Code/kc_device/build_s3",
@@ -1240,8 +1240,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__mdns" ],
             "file": "C:/Code/kc_device/build_s3/esp-idf/main/libmain.a",
-            "sources": [ "C:/Code/kc_device/main/main.c", "C:/Code/kc_device/main/chip_info.c", "C:/Code/kc_device/main/idf_provisioning.c", "C:/Code/kc_device/main/wifi_manager.c", "C:/Code/kc_device/main/provisioning_state.c", "C:/Code/kc_device/main/security.c", "C:/Code/kc_device/main/reset_button.c", "C:/Code/kc_device/main/time_sync.c", "C:/Code/kc_device/main/cloud_provisioning.c", "C:/Code/kc_device/main/http_server.c", "C:/Code/kc_device/main/api_key_manager.c", "C:/Code/kc_device/main/mdns_service.c", "C:/Code/kc_device/main/mqtt_telemetry.c", "C:/Code/kc_device/main/i2c_scanner.c", "C:/Code/kc_device/main/max17048.c", "C:/Code/kc_device/main/ezo_sensor.c", "C:/Code/kc_device/main/sensor_manager.c", "C:/Code/kc_device/main/web_file_editor.c", "C:/Code/kc_device/build_s3/index.html.S", "C:/Code/kc_device/build_s3/dashboard.css.S", "C:/Code/kc_device/build_s3/dashboard.js.S" ],
-            "include_dirs": [ "." ]
+            "sources": [ "C:/Code/kc_device/main/main.c", "C:/Code/kc_device/main/platform/chip_info.c", "C:/Code/kc_device/main/provisioning/idf_provisioning.c", "C:/Code/kc_device/main/provisioning/wifi_manager.c", "C:/Code/kc_device/main/provisioning/provisioning_state.c", "C:/Code/kc_device/main/provisioning/provisioning_wifi_ops_default.c", "C:/Code/kc_device/main/platform/security.c", "C:/Code/kc_device/main/platform/reset_button.c", "C:/Code/kc_device/main/boot/boot_monitor.c", "C:/Code/kc_device/main/boot/boot_coordinator.c", "C:/Code/kc_device/main/boot/boot_handlers.c", "C:/Code/kc_device/main/config/runtime_config.c", "C:/Code/kc_device/main/provisioning/provisioning_runner.c", "C:/Code/kc_device/main/services/provisioning/cloud_provisioning.c", "C:/Code/kc_device/main/services/http/http_server.c", "C:/Code/kc_device/main/services/http/http_handlers_sensors.c", "C:/Code/kc_device/main/services/http/http_websocket.c", "C:/Code/kc_device/main/services/keys/api_key_manager.c", "C:/Code/kc_device/main/services/discovery/mdns_service.c", "C:/Code/kc_device/main/services/telemetry/mqtt_payload_builder.c", "C:/Code/kc_device/main/services/telemetry/mqtt_publish_loop.c", "C:/Code/kc_device/main/services/telemetry/mqtt_connection_controller.c", "C:/Code/kc_device/main/services/telemetry/mqtt_publish_scheduler.c", "C:/Code/kc_device/main/services/telemetry/mqtt_connection_watchdog.c", "C:/Code/kc_device/main/services/telemetry/telemetry_pipeline.c", "C:/Code/kc_device/main/services/telemetry/mqtt_telemetry.c", "C:/Code/kc_device/main/platform/i2c_scanner.c", "C:/Code/kc_device/main/sensors/drivers/max17048.c", "C:/Code/kc_device/main/sensors/drivers/ezo_sensor.c", "C:/Code/kc_device/main/sensors/sensor_manager.c", "C:/Code/kc_device/main/sensors/config.c", "C:/Code/kc_device/main/sensors/pipeline.c", "C:/Code/kc_device/main/services/core/services.c", "C:/Code/kc_device/main/services/core/services_config.c", "C:/Code/kc_device/main/services/core/services_provisioning_bridge.c", "C:/Code/kc_device/main/network/network_boot.c", "C:/Code/kc_device/main/sensors/sensor_boot.c", "C:/Code/kc_device/main/services/http/web_file_editor.c", "C:/Code/kc_device/main/services/time_sync/time_sync.c", "C:/Code/kc_device/build_s3/index.html.S", "C:/Code/kc_device/build_s3/dashboard.css.S", "C:/Code/kc_device/build_s3/dashboard.js.S", "C:/Code/kc_device/build_s3/services.json.S", "C:/Code/kc_device/build_s3/api_keys.json.S" ],
+            "include_dirs": [ ".", "services/http", "C:/Code/kc_device/build_s3/esp-idf/main/generated" ]
         },
         "mbedtls": {
             "alias": "idf::mbedtls",
@@ -2941,7 +2941,7 @@
             "priv_reqs": [ "espressif__mdns" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__mdns" ],
-            "include_dirs": [ "." ]
+            "include_dirs": [ ".", "services/http", "C:/Code/kc_device/build_s3/esp-idf/main/generated" ]
         },
         "espressif__mdns": {
             "alias": "idf::espressif__mdns",

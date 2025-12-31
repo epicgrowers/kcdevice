@@ -6,11 +6,11 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
-#include "chip_info.h"
+#include "platform/chip_info.h"
 #include "provisioning/provisioning_state.h"
-#include "security.h"
-#include "reset_button.h"
-#include "i2c_scanner.h"
+#include "platform/security.h"
+#include "platform/reset_button.h"
+#include "platform/i2c_scanner.h"
 #include "boot/boot_config.h"
 #include "boot/boot_coordinator.h"
 #include "boot/boot_handlers.h"
@@ -75,7 +75,11 @@ void app_main(void)
     }
 
     network_boot_config_t network_boot_cfg = {0};
-    boot_coordinator_configure_network_boot(&s_boot_coordinator, NETWORK_READY_BIT, &network_boot_cfg);
+    boot_coordinator_configure_network_boot(
+        &s_boot_coordinator,
+        NETWORK_READY_BIT,
+        NETWORK_DEGRADED_BIT,
+        &network_boot_cfg);
     
     // Phase 2: Wi-Fi connection (required for network services)
     boot_sensor_launch_ctx_t sensor_launch_ctx = {0};
@@ -148,16 +152,25 @@ void app_main(void)
     }
     
     ESP_LOGI(TAG, "MAIN: Waiting up to %dms for network services (optional)...", NETWORK_READY_WAIT_MS);
-    bits = boot_coordinator_wait_bits(
+    EventBits_t network_wait_bits = boot_coordinator_wait_bits(
         &s_boot_coordinator,
-        NETWORK_READY_BIT,
+        NETWORK_READY_BIT | NETWORK_DEGRADED_BIT,
         false,
         pdMS_TO_TICKS(NETWORK_READY_WAIT_MS));
 
-    if (bits & NETWORK_READY_BIT) {
+    const bool network_ready = (network_wait_bits & NETWORK_READY_BIT) != 0;
+    EventGroupHandle_t boot_group = boot_coordinator_get_event_group(&s_boot_coordinator);
+    const EventBits_t latched_bits = (boot_group != NULL) ? xEventGroupGetBits(boot_group) : network_wait_bits;
+    const bool network_degraded = (latched_bits & NETWORK_DEGRADED_BIT) != 0;
+
+    if (network_ready) {
         ESP_LOGI(TAG, "MAIN: ✓ Network services ready");
-    } else {
+    } else if (!network_degraded) {
         ESP_LOGW(TAG, "MAIN: Network services still initializing after %dms, continuing offline", NETWORK_READY_WAIT_MS);
+    }
+
+    if (network_degraded) {
+        ESP_LOGW(TAG, "MAIN: Network services reported a degraded state; continuing with limited functionality");
     }
     
     // Phase 5: Enter normal operation mode

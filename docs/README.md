@@ -10,7 +10,7 @@ This document explains how the firmware provisions Wi-Fi using the ESP-IDF provi
 | Provisioning manager wrapper | `main/provisioning/idf_provisioning.c/.h` | Starts/stops ESP-IDF's Wi-Fi provisioning manager, selects BLE transport, enforces Security 1 + PoP, bridges callbacks into the local provisioning state machine, and kicks off Wi-Fi connection attempts once credentials arrive. |
 | Provisioning state machine | `main/provisioning/provisioning_state.c/.h` | Tracks transitions such as *BLE connected*, *credentials received*, *Wi-Fi connecting*, *provisioned*, or *failure*; notifies registered listeners (currently `main.c` logging). |
 | Wi-Fi manager | `main/provisioning/wifi_manager.c/.h` | Owns the station interface, saves credentials to NVS, retries connections, and exposes helpers to query connection state or clear credentials. |
-| Reset button | `main/reset_button.c/.h` | Short press clears Wi-Fi credentials and restarts; long press performs a factory reset (NVS erase). |
+| Reset button | `main/platform/reset_button.c/.h` | Short press clears Wi-Fi credentials and restarts; long press performs a factory reset (NVS erase). |
 | Cloud + services | `main/services/provisioning/cloud_provisioning.c`, `http_server.c`, `mqtt_telemetry.c`, `sensor_manager.c`, etc. | Idle until Wi-Fi is online, then perform their usual duties (TLS provisioning, HTTPS dashboard, MQTT telemetry, sensor polling). |
 
 ### ESP-IDF Provisioning Manager Configuration
@@ -24,11 +24,11 @@ This document explains how the firmware provisions Wi-Fi using the ESP-IDF provi
 ### Flow
 
 1. `main.c` boots, initializes security, the reset button, the provisioning state machine, and builds a `provisioning_plan_t` for the runner.
-2. `provisioning_run()` initializes the Wi-Fi stack and tests stored credentials. Success skips BLE provisioning entirely.
-3. On failure/no creds, `idf_provisioning_start()` starts the provisioning manager. BLE advertisements become visible in the ESP BLE Provisioning app while sensors continue booting.
+2. `provisioning_run()` initializes the Wi-Fi stack and tests stored credentials through the selected `provisioning_wifi_ops_t`. Success skips BLE provisioning entirely.
+3. On failure/no creds, `idf_provisioning_start()` starts the provisioning manager using the same Wi-Fi ops implementation (and now refuses to run if the ops init hook did not bring up the Wi-Fi stack). BLE advertisements become visible in the ESP BLE Provisioning app while sensors continue booting.
 4. User selects Security 1, enters the PoP `sumppop`, and supplies SSID/password.
-5. ESP-IDF provisioning manager emits `WIFI_PROV_CRED_RECV`; the wrapper lets ESP-IDF finish the Wi-Fi connection sequence.
-6. When `wifi_manager` reports `IP_EVENT_STA_GOT_IP`, credentials are saved and provisioning stops (`idf_provisioning_stop()`), freeing BLE resources and seeding the connection guard cache.
+5. ESP-IDF provisioning manager emits `WIFI_PROV_CRED_RECV`; the wrapper hands those credentials to the Wi-Fi ops implementation so the same code path (default: `wifi_manager`) drives the connection.
+6. When the Wi-Fi ops implementation reports `IP_EVENT_STA_GOT_IP`, credentials are saved and provisioning stops (`idf_provisioning_stop()`), freeing BLE resources and seeding the connection guard cache.
 7. Cloud services start (`network_boot_start()`), while `provisioning_connection_guard_poll()` keeps Wi-Fi healthy during normal operation.
 
 ## 2. Provisioning State Machine
@@ -103,4 +103,19 @@ Follow this checklist whenever you need to change environment-specific settings 
 3. **Clear stale secrets**: Long-press the BOOT button for a factory reset or run `idf.py erase_flash` so encrypted NVS is wiped. On next boot the API key manager reseeds from the embedded JSON before cloud provisioning runs.
 4. **Flash + verify**: Flash the new binary, open the monitor, and confirm that `API_KEY_MGR` logs “seeded from runtime config” before services start. Provision Wi-Fi if needed, then ensure HTTPS/MQTT start without “Cloud API key unavailable” errors.
 
+### Runtime validation rules
+
+`build.ps1` now fails fast if the embedded JSON blobs are missing required fields for the services you enabled:
+
+
 This flow keeps secrets in a single encrypted store (NVS) while still allowing per-environment overrides without code changes.
+
+### Detecting config drift
+
+
+## 9. Developer Utilities & Host Tests
+
+- **Host harness**: All Python-based provisioning tests live under `test/host/`. Run them with `python -m unittest discover -s test/host -p "test_*.py"`. The suite uses `provisioning_sim.py` to mirror the provisioning state machine, so we already cover stored-credential reuse, BLE success paths, Wi-Fi auth failures, and simulated reconnection-guard behavior without hardware.
+- **Runtime-config hashing**: `tools/generate_runtime_config_hash.py` consumes `config/runtime/services.json` and `config/runtime/api_keys.json`, emits `runtime_config_hash.h`, and runs automatically during `idf.py build` / `build.ps1`. Invoke it directly if you need to inspect the generated SHA256 digests while debugging OTA workflows.
+- **Runtime-config validator**: `tools/validate_runtime_config.py` mirrors the lint rules enforced by `build.ps1`. Run `python tools/validate_runtime_config.py` (optionally with `--services` / `--api-keys` overrides) to confirm JSON edits satisfy HTTPS, MQTT, dashboard, time-sync, and API-key requirements before kicking off an ESP-IDF build.
+- Firmware exposes those digests through `runtime_config_get_digest()`, allowing OTA workflows or diagnostics endpoints to compare the embedded JSON against what the device reports at runtime.

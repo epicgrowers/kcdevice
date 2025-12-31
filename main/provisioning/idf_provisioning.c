@@ -12,7 +12,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "provisioning/provisioning_state.h"
-#include "wifi_manager.h"
 
 #include "wifi_provisioning/manager.h"
 #include "wifi_provisioning/scheme_ble.h"
@@ -23,29 +22,49 @@ static const char *kPop = "sumppop";
 
 static bool provisioning_active;
 static char service_name[24];
+static const provisioning_wifi_ops_t *s_wifi_ops = NULL;
 
 static void provisioning_event_handler(void *user_data, esp_event_base_t event_base,
                                        int32_t event_id, void *event_data);
 
-esp_err_t idf_provisioning_start(void) {
+static esp_err_t provisioning_connect_with_ops(const wifi_sta_config_t *wifi_sta_cfg)
+{
+    if (!provisioning_wifi_ops_is_valid(s_wifi_ops) || wifi_sta_cfg == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char ssid[33] = {0};
+    char password[64] = {0};
+    strncpy(ssid, (const char *)wifi_sta_cfg->ssid, sizeof(ssid) - 1);
+    strncpy(password, (const char *)wifi_sta_cfg->password, sizeof(password) - 1);
+
+    const esp_err_t ret = s_wifi_ops->connect(ssid, password);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "WiFi connect via ops failed: %s", esp_err_to_name(ret));
+    }
+
+    memset(password, 0, sizeof(password));
+    return ret;
+}
+
+esp_err_t idf_provisioning_start(const provisioning_wifi_ops_t *wifi_ops) {
     if (provisioning_active) {
         ESP_LOGW(TAG, "Provisioning already running");
         return ESP_OK;
     }
 
-    // Initialize WiFi if not already initialized
-    // wifi_prov_mgr requires WiFi to be initialized first
+    if (!provisioning_wifi_ops_is_valid(wifi_ops)) {
+        ESP_LOGE(TAG, "idf_provisioning_start called without valid WiFi ops table");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    s_wifi_ops = wifi_ops;
+
+    // Require the injected Wi-Fi ops implementation to perform initialization first
     esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (sta_netif == NULL) {
-        ESP_LOGI(TAG, "WiFi not initialized, initializing for provisioning");
-        ESP_ERROR_CHECK(esp_netif_init());
-        ESP_ERROR_CHECK(esp_event_loop_create_default());
-        esp_netif_create_default_wifi_sta();
-        
-        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-        ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    } else {
-        ESP_LOGI(TAG, "WiFi already initialized, using existing configuration");
+        ESP_LOGE(TAG, "WiFi stack not initialized; call provisioning_wifi_ops.init() before provisioning");
+        return ESP_ERR_INVALID_STATE;
     }
 
     const char *adv_name = idf_provisioning_get_service_name();
@@ -54,7 +73,7 @@ esp_err_t idf_provisioning_start(void) {
         .scheme_event_handler = WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
         .app_event_handler = WIFI_PROV_EVENT_HANDLER_NONE,
         .wifi_prov_conn_cfg = {
-            .wifi_conn_attempts = 3,  // Let prov manager handle WiFi connection (3 attempts)
+            .wifi_conn_attempts = 0,  // Provisioning runner owns WiFi connection via wifi_ops
         },
     };
 
@@ -92,6 +111,8 @@ void idf_provisioning_stop(void) {
 
     esp_event_handler_unregister(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, provisioning_event_handler);
 
+    s_wifi_ops = NULL;
+
     ESP_LOGI(TAG, "Provisioning stopped");
 }
 
@@ -120,13 +141,16 @@ static void provisioning_event_handler(void *user_data, esp_event_base_t event_b
             provisioning_state_set(PROV_STATE_BLE_CONNECTED, STATUS_SUCCESS, "Waiting for app");
             break;
         case WIFI_PROV_CRED_RECV: {
-            // Provisioning manager will handle WiFi connection automatically
-            // Credentials will be saved automatically by ESP-IDF with WIFI_STORAGE_FLASH
+            // Credentials are still persisted by ESP-IDF via WIFI_STORAGE_FLASH
             wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
             ESP_LOGI(TAG, "Received Wi-Fi credentials for SSID: %s (will be saved automatically)", wifi_sta_cfg->ssid);
             
             provisioning_state_set(PROV_STATE_CREDENTIALS_RECEIVED, STATUS_SUCCESS,
                                    "Credentials received");
+
+            if (provisioning_connect_with_ops(wifi_sta_cfg) == ESP_OK) {
+                ESP_LOGI(TAG, "Handed credentials to WiFi ops for connection management");
+            }
             break;
         }
         case WIFI_PROV_CRED_FAIL:

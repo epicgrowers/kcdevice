@@ -11,10 +11,16 @@
 
 #include "esp_err.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct {
+	uint16_t https_port;
+	bool time_synced;
+} http_server_config_t;
 
 /**
  * @brief Initialize and start HTTPS server
@@ -24,7 +30,7 @@ extern "C" {
  * 
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t http_server_start(void);
+esp_err_t http_server_start(const http_server_config_t *config);
 
 /**
  * @brief Stop HTTPS server

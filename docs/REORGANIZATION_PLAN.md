@@ -17,6 +17,20 @@ This document tracks the ongoing effort to reshape the KC-Device firmware into c
 - Created `config/runtime/` with an embedded `services.json` plus a `runtime_config` loader so network boot consumes environment-specific overrides before launching the services core.
 - Relocated `wifi_manager.c/.h` into the provisioning package (`main/provisioning/`) so the entire stored-credential and reconnection flow stays encapsulated with the rest of the provisioning stack.
 - Routed TLS certificates, MQTT CA blobs, and device metadata through a new `services_provisioning_api_t` so only `network_boot.c` touches `cloud_provisioning`, while HTTP + MQTT modules receive everything via `services_config_t`.
+- Added a `runtime_config_hash` build target plus `runtime_config_get_digest()` so every firmware image now carries SHA256 digests + sizes for the embedded JSON blobs, letting OTA updates confirm config drift before launching services.
+- Added `provisioning_wifi_ops_t` so `provisioning_run()` can swap Wi-Fi implementations (or host-side stubs) without leaking `wifi_manager_*` past the provisioning package.
+- Taught `idf_provisioning_start()` to accept the injected Wi-Fi ops pointer so BLE credential events now travel through the same `wifi_manager` (or test stub) path as stored-credential boots.
+- Removed duplicate `esp_netif_init()`/`esp_wifi_init()` inside `idf_provisioning_start()` so Wi-Fi lifecycle ownership fully lives inside the injected ops and provisioning now fails fast when the caller forgets to initialize Wi-Fi.
+- Consolidated `chip_info`, `security`, `reset_button`, and `i2c_scanner` under a new `platform/` directory so board-specific glue no longer clutters the component root and future hardware variants have a single home for overrides.
+- Introduced `test/host/` with a README plus the `provisioning_sim.py` harness so provisioning state-machine tests now run (covering stored credentials, BLE success, auth failures, and reconnection guard scenarios).
+- Documented the `tools/` directory (currently `generate_runtime_config_hash.py`) so contributors know where developer utilities live and how the runtime-config hashing step works.
+- Added `tools/validate_runtime_config.py` so runtime JSON edits can be linted locally, preventing slow ESP-IDF builds from failing on schema mistakes.
+- Began carving `services/telemetry/mqtt_telemetry.c` by moving JSON/payload construction into `mqtt_payload_builder.c`, paving the way for additional telemetry refactors.
+- Introduced `services/telemetry/mqtt_connection_controller.c` to own MQTT supervisor state so `mqtt_telemetry.c` can focus on payload publishing logic.
+- Extended the controller with a metrics snapshot API (state, run flag, reconnect count, consecutive failures, and last transition timestamp) so future dashboards/tests can introspect telemetry health without reaching into the publish task.
+- Added an HTTPS endpoint (`/api/mqtt/status`) that exposes those metrics for dashboards, CLI diagnostics, or host automation without requiring firmware changes.
+- Added `config/runtime/sensor_profiles.json` plus `tools/validate_sensor_profiles.py` to lint Atlas sensor stacks (duplicate I2C addresses, unsupported channels, etc.) outside of ESP-IDF builds.
+- Added telemetry tuning knobs (publish interval + busy/client/idle backoffs) to `config/runtime/services.json`, wiring them through `runtime_config`, `services_config_t`, `mqtt_telemetry.c`, `tools/validate_runtime_config.py`, and the build script so publish cadence is environment-configurable without recompiling.
 
 ## Guiding Principles
 
@@ -45,7 +59,7 @@ _Status 2025-12-26_: **Completed** – boot coordinator + handlers own all boot 
 
 ### Segment 2 – Provisioning + Wi-Fi Stack Cleanup
 
-_Status 2025-12-27_: **In progress** – provisioning sources live under `main/provisioning/`, `provisioning_run()` replaces the old helper, the reconnection guard moved out of `main.c`, and the Wi-Fi manager is now encapsulated behind provisioning helpers. Host-side state-transition stubs now live in `test/test_provisioning_state_stub.py` while we finish wiring the harness.
+_Status 2025-12-30_: **Completed** – provisioning sources live under `main/provisioning/`, `provisioning_run()` replaces the old helper, the reconnection guard moved out of `main.c`, `idf_provisioning_start()` now feeds credentials through the injected Wi-Fi ops (default: `wifi_manager`), and host-side state-transition stubs live in `test/host/test_provisioning_state_stub.py` for future harnesses.
 
 **Goal**: Merge provisioning state, Wi-Fi manager, and the provisioning runner into a cohesive package that hides internal event chatter.
 
@@ -56,7 +70,7 @@ _Status 2025-12-27_: **In progress** – provisioning sources live under `main/p
 
 **Deliverables**:
 - Public header documenting the provisioning plan/outcome structures.
-- Unit-test stubs (can be host-side) for state transitions (initial skeleton: `test/test_provisioning_state_stub.py`).
+- Unit-test stubs (can be host-side) for state transitions (initial skeleton: `test/host/test_provisioning_state_stub.py`).
 
 ### Segment 3 – Sensor Stack Packaging
 
@@ -96,18 +110,83 @@ _Status 2025-12-27_: **Completed** – `services_config_t` now carries a provisi
 
 ### Segment 5 – Configuration + Secrets Hygiene
 
-_Status 2025-12-27_: **In progress** – runtime overrides now live in `config/runtime/services.json`, `config/runtime/api_keys.json` seeds the encrypted secret store, and `network_boot.c` applies overrides at boot while we finish build validation.
+_Status 2025-12-30_: **Completed** – runtime overrides now live in `config/runtime/services.json`, encrypted API keys seed from `config/runtime/api_keys.json`, `build.ps1` enforces schema validation, and the new `runtime_config_hash` target embeds SHA256 digests exposed via `runtime_config_get_digest()` so OTA upgrades can detect drift.
 
 **Goal**: Untangle configuration values from source files and ensure secrets are pluggable per environment.
 
 **Tasks**:
 - [done] Create `config/runtime/` for JSON/TOML describing sensors, endpoints, certificates, etc., and load them at boot.
 - [done] Ensure `api_key_manager` pulls from a single secret store (encrypted NVS seeded via `config/runtime/api_keys.json`) instead of hard-coded constants.
-- Expand `build.ps1` to validate required configs (e.g., fail early if certificates are missing for HTTPS dashboard).
+- [done] Expand `build.ps1` to validate required configs (e.g., fail early if certificates are missing for HTTPS dashboard).
+- [done] Generate SHA256 digests for the embedded JSON blobs via `runtime_config_hash` (run with `idf.py runtime_config_hash`) and expose them at runtime for OTA verification.
 
 **Deliverables**:
 - Checklist in `docs/README.md` describing how to rotate keys and provision configs.
 - Optional CMake target that embeds config blobs with hashing so OTA updates can detect drift.
+
+### Segment 6 – Platform Utilities Consolidation
+
+_Status 2025-12-30_: **Completed** – chip metadata logging, security init, reset-button glue, and the I2C scanner now live under `main/platform/`, `main.c` only includes `platform/*` headers, and `docs/PROJECT_STRUCTURE.md` reflects the new ownership boundary.
+
+**Goal**: Group the hardware-adjacent helpers that were cluttering the component root so future board variants (or host harnesses) can override them in one place.
+
+**Tasks**:
+- Create `main/platform/` and move `chip_info.*`, `security.*`, `reset_button.*`, and `i2c_scanner.*` into it without behavioral changes.
+- Update all includes (`main.c`, `boot_handlers`, sensor sources) to reference `platform/...` paths.
+- Point `main/CMakeLists.txt` at the new file locations and keep the runtime config hash integration intact.
+- Refresh `docs/PROJECT_STRUCTURE.md` (and this plan) to introduce the `platform/` section so onboarding material matches the codebase.
+
+**Deliverables**:
+- Clean `main/` root that only exposes orchestration + submodules.
+- Documented `platform/` responsibilities for future contributors.
+
+### Segment 7 – Developer Tooling & Host Harness
+
+_Status 2025-12-30_: **In progress** – `test/host/` now contains the provisioning simulator + active `unittest` coverage (stored credentials, BLE happy path, auth failure, reconnection guard), `docs/PROJECT_STRUCTURE.md` / `docs/README.md` describe the host harness plus runtime-config tooling, `services/telemetry/mqtt_connection_controller.c` owns connection/retry state outside `mqtt_telemetry.c` and now exposes metrics snapshots (state/run flag/reconnect counters/timestamps), and `tools/validate_sensor_profiles.py` lints the new `config/runtime/sensor_profiles.json`. Remaining work centers on deeper MQTT task splits (connection scheduling vs. publishing) and additional host/dev tooling.
+
+**Goal**: Turn the “future cleanups” list into actionable deliverables by organizing host-side tests and documenting the tooling required to validate runtime configs outside the firmware build.
+
+**Tasks**:
+- [done] Create `test/host/`, move `test_provisioning_state_stub.py`, and add a README documenting the execution command + coverage roadmap.
+- [done] Flesh out provisioning mocks via `provisioning_sim.py` so the unit tests assert stored-credential reuse, BLE happy paths, Wi-Fi failure codes, and connection-guard retries without hardware.
+- [done] Add documentation under `tools/` plus the `validate_runtime_config.py` CLI so runtime-config linting can happen without invoking ESP-IDF.
+- [done] Extract MQTT payload construction into `services/telemetry/mqtt_payload_builder.c` so the main telemetry loop focuses on connection + scheduling.
+- [done] Introduce `services/telemetry/mqtt_connection_controller.c` to encapsulate supervisor/retry state while `mqtt_telemetry.c` manages payloads.
+- [done] Add `config/runtime/sensor_profiles.json` plus `tools/validate_sensor_profiles.py` so Atlas sensor stacks can be linted locally before flashing.
+- [done] Teach the connection controller to expose metrics snapshots (state, should-run flag, reconnect count, consecutive failures, last transition timestamps) for future dashboards and host tests.
+- [done] Wire `/api/mqtt/status` into the HTTPS server so those metrics are available to dashboards/scripts without decoding logs.
+- [done] Add `tools/mqtt_status_probe.py` so developers can poll `/api/mqtt/status` from a laptop CLI when diagnosing MQTT issues.
+- [done] Add `tools/live_diag_report.py` for combined `/api/status` + `/api/mqtt/status` polling to provide live diagnostic summaries from the host.
+- [done] Add `tools/ws_diag.py` for `/ws/sensors` monitoring (WebSocket focus snapshots/status) so developers can confirm streaming telemetry end-to-end.
+- [done] Add a lightweight `mqtt_connection_watchdog` helper (timer task + fault hook) that inspects `mqtt_connection_controller_get_metrics()` and raises a services degradation event when the client is stuck in CONNECTING/ERROR for longer than a configurable window.
+- [done] Split the publish loop into a dedicated scheduler helper (`mqtt_publish_loop.c`) so the FreeRTOS task now delegates interval/back-pressure logic to a testable unit that mirrors publish-on-read triggers and offline backoffs.
+- [done] Extend the host harness with `test/host/mqtt_watchdog_sim.py` + tests to simulate MQTT disconnect storms, validating watchdog degradation events and the `/api/mqtt/status` payload without hardware.
+- Continue evaluating whether additional MQTT helpers (connection monitors vs. publisher tasks) or host harnesses are needed as telemetry grows.
+
+**Deliverables**:
+- Green (non-skipped) host tests that validate provisioning behavior under multiple scenarios.
+- A documented `tools/` tree with at least the runtime-config hash generator plus stubs for upcoming analyzers.
+- Updated onboarding docs pointing contributors to both host tests and developer tooling.
+
+### Segment 8 – Telemetry Streamlining & Diagnostics
+
+_Status 2025-12-31_: **In progress** – telemetry runtime config (publish interval + loop backoffs) now flows from `config/runtime/services.json` through `services_start()` into `mqtt_telemetry`, and validators/build gating enforce the schema. Remaining work covers the telemetry facade, structured logging, richer diagnostics endpoints, and host tests.
+
+**Goal**: Finish carving `services/telemetry/` into composable layers (connection controller, publish scheduler, payload builders, diagnostics exporters) and make telemetry health observable without attaching a serial console.
+
+- **Tasks**:
+- [done] Finalize the MQTT telemetry split by moving retry/backoff constants, queue sizing, and interval knobs into a dedicated telemetry block embedded in `config/runtime/services.json`, with runtime loaders + build validation to keep behavior environment-tunable without recompiles.
+- Introduce a `telemetry_pipeline_t` facade that feeds both MQTT and future transports (WebSocket mirror, local buffering) from a single sensor snapshot source, eliminating direct `sensor_manager` calls from telemetry workers.
+- Add structured logging helpers (`telemetry_log_publish_attempt()`, `telemetry_log_drop_reason()`) to replace ad-hoc `ESP_LOGI` calls and ensure every publish attempt includes payload digest, sensor snapshot ID, and connection state.
+- Expand `/api/mqtt/status` (or add `/api/telemetry/status`) with queue depth, last-publish timestamp, and watchdog fault counts so dashboards can highlight stalled telemetry without reading logs.
+- Build host-side regression tests (`test/host/test_mqtt_scheduler.py`) that simulate bursty sensor updates, forced disconnects, and payload serialization failures to keep the telemetry stack stable during refactors.
+
+**Deliverables**:
+- `services/telemetry/README.md` describing module boundaries (payload builder, scheduler, connection controller, watchdog, diagnostics) plus how they interact with `services_start()`.
+- Configurable telemetry settings (`config/runtime/telemetry.json` or an extended `services.json`) validated by `tools/validate_runtime_config.py`.
+- Expanded `/api/mqtt/status` (or new endpoint) payload documented in `docs/API.md` + sample output captured in `docs/TELEMETRY_DIAGNOSTICS.md` for onboarding.
+- Passing host tests that exercise telemetry scheduling and diagnostics without hardware, integrated into the existing `test/host` harness.
+
 
 ## Tracking + Next Steps
 
@@ -116,4 +195,4 @@ _Status 2025-12-27_: **In progress** – runtime overrides now live in `config/r
 3. Whenever a segment introduces new build targets, update `build.ps1` and mention them in `README.md`.
 4. Consider tagging releases between major segments so QA can bisect regressions quickly.
 
-_Last updated: 2025-12-27_
+_Last updated: 2025-12-31_

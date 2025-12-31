@@ -6,9 +6,18 @@
 #include "freertos/task.h"
 #include "provisioning/idf_provisioning.h"
 #include "provisioning/provisioning_state.h"
-#include "wifi_manager.h"
 
 static const char *TAG = "PROV_RUN";
+
+static const provisioning_wifi_ops_t *s_wifi_ops = NULL;
+
+static const provisioning_wifi_ops_t *provisioning_get_wifi_ops(void)
+{
+    if (s_wifi_ops == NULL) {
+        s_wifi_ops = provisioning_wifi_ops_default();
+    }
+    return s_wifi_ops;
+}
 
 static char s_guard_ssid[33];
 static char s_guard_password[64];
@@ -33,10 +42,17 @@ static void log_sensor_progress(const provisioning_plan_t *plan, uint32_t elapse
     } else {
         ESP_LOGI(TAG, "Sensors initializing (t=%lus) - provisioning in progress", (unsigned long)elapsed_seconds);
     }
+
 }
+
 
 static void provisioning_guard_store_credentials(const char *ssid, const char *password)
 {
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (ops == NULL) {
+        return;
+    }
+
     if (ssid != NULL && password != NULL) {
         strncpy(s_guard_ssid, ssid, sizeof(s_guard_ssid) - 1);
         s_guard_ssid[sizeof(s_guard_ssid) - 1] = '\0';
@@ -49,7 +65,7 @@ static void provisioning_guard_store_credentials(const char *ssid, const char *p
 
     char refresh_ssid[33] = {0};
     char refresh_password[64] = {0};
-    if (wifi_manager_get_stored_credentials(refresh_ssid, refresh_password) == ESP_OK) {
+    if (ops->get_stored_credentials(refresh_ssid, refresh_password) == ESP_OK) {
         strncpy(s_guard_ssid, refresh_ssid, sizeof(s_guard_ssid) - 1);
         s_guard_ssid[sizeof(s_guard_ssid) - 1] = '\0';
         strncpy(s_guard_password, refresh_password, sizeof(s_guard_password) - 1);
@@ -62,31 +78,35 @@ static void provisioning_guard_store_credentials(const char *ssid, const char *p
 
 static esp_err_t attempt_stored_connection(provisioning_outcome_t *outcome)
 {
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (!provisioning_wifi_ops_is_valid(ops)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     char stored_ssid[33] = {0};
     char stored_password[64] = {0};
 
-    if (wifi_manager_get_stored_credentials(stored_ssid, stored_password) != ESP_OK) {
+    if (ops->get_stored_credentials(stored_ssid, stored_password) != ESP_OK) {
         ESP_LOGI(TAG, "No stored credentials found, provisioning required");
         return ESP_ERR_NOT_FOUND;
     }
 
     ESP_LOGI(TAG, "Found stored credentials, attempting to connect to: %s", stored_ssid);
-    const esp_err_t ret = wifi_manager_connect(stored_ssid, stored_password);
+    const esp_err_t ret = ops->connect(stored_ssid, stored_password);
 
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to initiate WiFi connection using stored credentials: %s", esp_err_to_name(ret));
         memset(stored_password, 0, sizeof(stored_password));
         return ret;
     }
 
     ESP_LOGI(TAG, "Connecting to stored WiFi network...");
     int wait_seconds = 0;
-    while (!wifi_manager_is_connected() && wait_seconds < WIFI_STORED_CREDENTIAL_WAIT_SEC) {
+    while (!ops->is_connected() && wait_seconds < WIFI_STORED_CREDENTIAL_WAIT_SEC) {
         vTaskDelay(pdMS_TO_TICKS(1000));
         wait_seconds++;
     }
 
-    if (!wifi_manager_is_connected()) {
+    if (!ops->is_connected()) {
         ESP_LOGW(TAG, "Failed to connect with stored credentials after %ds", WIFI_STORED_CREDENTIAL_WAIT_SEC);
         memset(stored_password, 0, sizeof(stored_password));
         return ESP_FAIL;
@@ -120,7 +140,7 @@ static esp_err_t run_ble_provisioning(const provisioning_plan_t *plan, provision
     const char *service_name = idf_provisioning_get_service_name();
     ESP_LOGI(TAG, "Starting ESP-IDF BLE provisioning (service=%s)", service_name);
 
-    esp_err_t ret = idf_provisioning_start();
+    esp_err_t ret = idf_provisioning_start(provisioning_get_wifi_ops());
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start provisioning: %s", esp_err_to_name(ret));
         return ret;
@@ -166,7 +186,19 @@ esp_err_t provisioning_run(const provisioning_plan_t *plan, provisioning_outcome
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t ret = wifi_manager_init();
+    const provisioning_wifi_ops_t *ops = plan->wifi_ops;
+    if (ops == NULL) {
+        ops = provisioning_wifi_ops_default();
+    }
+
+    if (!provisioning_wifi_ops_is_valid(ops)) {
+        ESP_LOGE(TAG, "Invalid WiFi ops table supplied to provisioning_run");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    s_wifi_ops = ops;
+
+    esp_err_t ret = ops->init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize WiFi manager: %s", esp_err_to_name(ret));
         return ret;
@@ -190,6 +222,11 @@ esp_err_t provisioning_run(const provisioning_plan_t *plan, provisioning_outcome
 
 void provisioning_connection_guard_poll(void)
 {
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (ops == NULL) {
+        return;
+    }
+
     if (!s_guard_has_credentials) {
         provisioning_guard_store_credentials(NULL, NULL);
         if (!s_guard_has_credentials) {
@@ -197,7 +234,7 @@ void provisioning_connection_guard_poll(void)
         }
     }
 
-    if (wifi_manager_is_connected()) {
+    if (ops->is_connected()) {
         return;
     }
 
@@ -209,7 +246,7 @@ void provisioning_connection_guard_poll(void)
     s_last_guard_attempt = now;
     ESP_LOGW(TAG, "WiFi connection lost, attempting to reconnect to %s", s_guard_ssid);
 
-    const esp_err_t ret = wifi_manager_connect(s_guard_ssid, s_guard_password);
+    const esp_err_t ret = ops->connect(s_guard_ssid, s_guard_password);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to trigger WiFi reconnect: %s", esp_err_to_name(ret));
     }
@@ -224,7 +261,12 @@ esp_err_t provisioning_get_saved_network(provisioning_saved_network_info_t *info
     memset(info, 0, sizeof(*info));
 
     char password[64] = {0};
-    esp_err_t ret = wifi_manager_get_stored_credentials(info->ssid, password);
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (ops == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t ret = ops->get_stored_credentials(info->ssid, password);
     memset(password, 0, sizeof(password));
 
     if (ret == ESP_OK) {
@@ -240,15 +282,24 @@ esp_err_t provisioning_clear_saved_network(void)
     memset(s_guard_password, 0, sizeof(s_guard_password));
     s_guard_has_credentials = false;
     s_last_guard_attempt = 0;
-    return wifi_manager_clear_credentials();
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (ops == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return ops->clear_credentials();
 }
 
 bool provisioning_wifi_is_connected(void)
 {
-    return wifi_manager_is_connected();
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    return (ops != NULL) ? ops->is_connected() : false;
 }
 
 esp_err_t provisioning_disconnect(void)
 {
-    return wifi_manager_disconnect();
+    const provisioning_wifi_ops_t *ops = provisioning_get_wifi_ops();
+    if (ops == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return ops->disconnect();
 }

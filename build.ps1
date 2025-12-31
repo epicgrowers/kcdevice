@@ -66,6 +66,188 @@ $config = @{
 
 $targetConfig = $config[$Target]
 
+function Test-RuntimeConfiguration {
+    param(
+        [string]$RepoRoot,
+        [string]$Target
+    )
+
+    $runtimeDir = Join-Path $RepoRoot "config/runtime"
+    $servicesFile = Join-Path $runtimeDir "services.json"
+    $apiKeysFile = Join-Path $runtimeDir "api_keys.json"
+    $errors = @()
+
+    if (-not (Test-Path $servicesFile)) {
+        $errors += "Missing runtime config file: $servicesFile"
+    } else {
+        try {
+            $servicesJson = Get-Content -Path $servicesFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            $errors += "Failed to parse ${servicesFile}: $($_.Exception.Message)"
+        }
+
+        $httpEnabled = $false
+        $mqttEnabled = $false
+        $mdnsEnabled = $false
+        $timeSyncEnabled = $false
+
+        if ($servicesJson -and $servicesJson.services) {
+            $servicesSection = $servicesJson.services
+            $httpEnabled = [bool]$servicesSection.enable_http_server
+            $mqttEnabled = [bool]$servicesSection.enable_mqtt
+            $mdnsEnabled = [bool]$servicesSection.enable_mdns
+            $timeSyncEnabled = [bool]$servicesSection.enable_time_sync
+
+            if ($httpEnabled -and $Target -eq 'c6') {
+                Write-Warning "HTTPS dashboard is enabled in services.json but the ESP32-C6 build disables it at runtime."
+            }
+
+            if ($httpEnabled -and (-not $servicesSection.https_port -or $servicesSection.https_port -le 0)) {
+                $errors += "services.json must provide a positive https_port when enable_http_server is true."
+            }
+        } else {
+            $errors += "services.json is missing the 'services' object."
+        }
+
+        if ($mqttEnabled) {
+            if (-not $servicesJson.mqtt) {
+                $errors += "services.json is missing the 'mqtt' object while MQTT service is enabled."
+            } else {
+                $mqttSection = $servicesJson.mqtt
+
+                if ([string]::IsNullOrWhiteSpace($mqttSection.broker_uri)) {
+                    $errors += "mqtt.broker_uri must be a non-empty string when MQTT is enabled."
+                }
+
+                if ([string]::IsNullOrWhiteSpace($mqttSection.username)) {
+                    $errors += "mqtt.username must be provided when MQTT is enabled."
+                }
+
+                if ([string]::IsNullOrWhiteSpace($mqttSection.password)) {
+                    $errors += "mqtt.password must be provided when MQTT is enabled."
+                }
+            }
+
+            if (-not $servicesJson.telemetry) {
+                $errors += "services.json is missing the 'telemetry' object while MQTT service is enabled."
+            } else {
+                $telemetrySection = $servicesJson.telemetry
+
+                if ($null -eq $telemetrySection.publish_interval_sec -or $telemetrySection.publish_interval_sec -lt 0 -or $telemetrySection.publish_interval_sec -gt 86400) {
+                    $errors += "telemetry.publish_interval_sec must be between 0 and 86400 seconds."
+                }
+
+                $backoffFields = @('busy_backoff_ms', 'client_backoff_ms', 'idle_delay_ms')
+                foreach ($field in $backoffFields) {
+                    $value = $telemetrySection.$field
+                    if ($null -eq $value -or $value -lt 0 -or $value -gt 600000) {
+                        $errors += "telemetry.$field must be between 0 and 600000 milliseconds."
+                    }
+                }
+            }
+        }
+
+        if ($mdnsEnabled -or $httpEnabled) {
+            if (-not $servicesJson.dashboard) {
+                $errors += "services.json is missing the 'dashboard' object while HTTP/mDNS services are enabled."
+            } else {
+                $dashboardSection = $servicesJson.dashboard
+                $hostname = $dashboardSection.mdns_hostname
+                $instanceName = $dashboardSection.mdns_instance_name
+
+                if ([string]::IsNullOrWhiteSpace($hostname)) {
+                    $errors += "dashboard.mdns_hostname must be provided when the dashboard or mDNS is enabled."
+                } elseif (-not [regex]::IsMatch($hostname.ToLowerInvariant(), '^[a-z0-9\-]+$')) {
+                    $errors += "dashboard.mdns_hostname may only contain lowercase letters, numbers, and hyphens."
+                } elseif ($hostname.Length -gt 32) {
+                    $errors += "dashboard.mdns_hostname must be 32 characters or fewer."
+                }
+
+                if ([string]::IsNullOrWhiteSpace($instanceName)) {
+                    $errors += "dashboard.mdns_instance_name must be provided when the dashboard or mDNS is enabled."
+                } elseif ($instanceName.Length -gt 63) {
+                    $errors += "dashboard.mdns_instance_name must be 63 characters or fewer (mDNS label limit)."
+                }
+            }
+        }
+
+        if ($timeSyncEnabled) {
+            if (-not $servicesJson.time_sync) {
+                $errors += "services.json is missing the 'time_sync' object while time synchronization is enabled."
+            } else {
+                $timeSection = $servicesJson.time_sync
+                if ([string]::IsNullOrWhiteSpace($timeSection.timezone)) {
+                    $errors += "time_sync.timezone must be provided when time synchronization is enabled."
+                }
+
+                if ($null -eq $timeSection.timeout_sec -or $timeSection.timeout_sec -le 0 -or $timeSection.timeout_sec -gt 120) {
+                    $errors += "time_sync.timeout_sec must be between 1 and 120 seconds."
+                }
+
+                if ($null -ne $timeSection.retry_attempts) {
+                    if ($timeSection.retry_attempts -lt 0 -or $timeSection.retry_attempts -gt 5) {
+                        $errors += "time_sync.retry_attempts must be between 0 and 5."
+                    }
+                }
+
+                if ($null -ne $timeSection.retry_delay_sec) {
+                    if ($timeSection.retry_delay_sec -lt 1 -or $timeSection.retry_delay_sec -gt 300) {
+                        $errors += "time_sync.retry_delay_sec must be between 1 and 300 seconds."
+                    }
+                }
+            }
+        }
+    }
+
+    if (-not (Test-Path $apiKeysFile)) {
+        $errors += "Missing runtime key file: $apiKeysFile"
+    } else {
+        try {
+            $apiKeysJson = Get-Content -Path $apiKeysFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            $errors += "Failed to parse ${apiKeysFile}: $($_.Exception.Message)"
+        }
+
+        if ($apiKeysJson -and $apiKeysJson.api_keys) {
+            $validKeys = @()
+            foreach ($entry in $apiKeysJson.api_keys) {
+                if (-not $entry.value -or [string]::IsNullOrWhiteSpace($entry.value)) {
+                    continue
+                }
+
+                if ($entry.value -eq 'REPLACE_WITH_PROVISIONING_KEY') {
+                    continue
+                }
+
+                if ($entry.type -and $entry.type -notin @('cloud', 'dashboard', 'custom')) {
+                    $errors += "API key '$($entry.name)' has unsupported type '$($entry.type)'."
+                }
+
+                $validKeys += $entry
+            }
+
+            if ($validKeys.Count -eq 0) {
+                $errors += "api_keys.json must contain at least one non-placeholder key value."
+            }
+        } else {
+            $errors += "api_keys.json is missing the 'api_keys' array."
+        }
+    }
+
+    if ($errors.Count -gt 0) {
+        Write-Host "" 
+        Write-Host "Runtime configuration validation failed:" -ForegroundColor Red
+        foreach ($err in $errors) {
+            Write-Host "  - $err" -ForegroundColor Red
+        }
+        Write-Host ""
+        return $false
+    }
+
+    Write-Host "Runtime configuration validation passed." -ForegroundColor Green
+    return $true
+}
+
 # Display header
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
@@ -80,6 +262,13 @@ if ($Port) {
 }
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
+
+$actionsRequiringValidation = @('build', 'flash', 'all', 'test')
+if ($actionsRequiringValidation -contains $Action) {
+    if (-not (Test-RuntimeConfiguration -RepoRoot $PSScriptRoot -Target $Target)) {
+        exit 1
+    }
+}
 
 # Build the idf.py command
 $idfCmd = "idf.py"

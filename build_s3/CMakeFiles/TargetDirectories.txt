@@ -883,6 +883,7 @@ C:/Code/kc_device/build_s3/esp-idf/espressif__mdns/CMakeFiles/list_install_compo
 C:/Code/kc_device/build_s3/esp-idf/espressif__mdns/CMakeFiles/install.dir
 C:/Code/kc_device/build_s3/esp-idf/espressif__mdns/CMakeFiles/install/local.dir
 C:/Code/kc_device/build_s3/esp-idf/espressif__mdns/CMakeFiles/install/strip.dir
+C:/Code/kc_device/build_s3/esp-idf/main/CMakeFiles/runtime_config_hash.dir
 C:/Code/kc_device/build_s3/esp-idf/main/CMakeFiles/__idf_main.dir
 C:/Code/kc_device/build_s3/esp-idf/main/CMakeFiles/edit_cache.dir
 C:/Code/kc_device/build_s3/esp-idf/main/CMakeFiles/rebuild_cache.dir

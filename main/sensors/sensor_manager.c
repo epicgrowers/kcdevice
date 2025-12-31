@@ -4,7 +4,7 @@
  */
 
 #include "sensor_manager.h"
-#include "i2c_scanner.h"
+#include "platform/i2c_scanner.h"
 #include "drivers/max17048.h"
 #include "drivers/ezo_sensor.h"
 #include "services/telemetry/mqtt_telemetry.h"

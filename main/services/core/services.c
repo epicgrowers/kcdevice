@@ -1,11 +1,15 @@
 #include "services/core/services.h"
+#include "services/core/services_provisioning_bridge.h"
 
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
-#include "mdns_service.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "services/discovery/mdns_service.h"
 #include "services/http/http_server.h"
 #include "services/telemetry/mqtt_telemetry.h"
+#include "services/time_sync/time_sync.h"
 
 typedef struct {
     bool running;
@@ -13,6 +17,8 @@ typedef struct {
     bool mdns_started;
     bool mqtt_initialized;
     bool mqtt_started;
+    bool time_sync_started;
+    bool time_sync_ready;
     services_config_t config;
     services_dependencies_t deps;
     services_status_listener_t listener;
@@ -22,20 +28,31 @@ typedef struct {
 static const char *TAG = "SERVICES_CORE";
 static services_state_t s_state = {0};
 
+static void services_set_ready_bit(void);
+static void services_set_degraded_bit(void);
+static void services_handle_fault(const services_status_event_t *event);
+static bool services_wait_for_time_sync(uint32_t timeout_sec);
+
 static void services_emit_event(services_event_type_t type,
                                 esp_err_t result,
                                 const char *component)
 {
-    if (s_state.listener == NULL) {
-        return;
-    }
-
     services_status_event_t event = {
         .type = type,
         .component = component,
         .result = result,
     };
-    s_state.listener(&event, s_state.listener_ctx);
+
+    if (s_state.listener != NULL) {
+        s_state.listener(&event, s_state.listener_ctx);
+    }
+
+    services_handle_fault(&event);
+}
+
+void services_report_degraded(const char *component, esp_err_t result)
+{
+    services_emit_event(SERVICES_EVENT_DEGRADED, result, component);
 }
 
 static void services_set_ready_bit(void)
@@ -45,6 +62,114 @@ static void services_set_ready_bit(void)
     }
 
     xEventGroupSetBits(s_state.deps.boot_event_group, s_state.deps.network_ready_bit);
+}
+
+static void services_set_degraded_bit(void)
+{
+    if (s_state.deps.boot_event_group == NULL || s_state.deps.degraded_bit == 0) {
+        return;
+    }
+
+    xEventGroupSetBits(s_state.deps.boot_event_group, s_state.deps.degraded_bit);
+}
+
+static void services_handle_fault(const services_status_event_t *event)
+{
+    if (event == NULL || event->type != SERVICES_EVENT_DEGRADED) {
+        return;
+    }
+
+    services_set_degraded_bit();
+
+    if (s_state.deps.fault_handler != NULL) {
+        s_state.deps.fault_handler(event, s_state.deps.fault_handler_ctx);
+    }
+}
+
+static bool services_wait_for_time_sync(uint32_t timeout_sec)
+{
+    uint32_t effective_timeout = (timeout_sec > 0) ? timeout_sec : 10;
+
+    for (uint32_t waited = 0; waited < effective_timeout; waited++) {
+        if (time_sync_is_synced()) {
+            return true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    return time_sync_is_synced();
+}
+
+static void services_start_time_sync(void)
+{
+    if (!s_state.config.enable_time_sync) {
+        return;
+    }
+
+    const char *timezone = s_state.config.timezone;
+    if (timezone == NULL || timezone[0] == '\0') {
+        timezone = "UTC";
+    }
+
+    uint32_t timeout_sec = (s_state.config.time_sync_timeout_sec > 0)
+                               ? s_state.config.time_sync_timeout_sec
+                               : 10;
+    uint32_t retry_delay_sec = (s_state.config.time_sync_retry_delay_sec > 0)
+                                   ? s_state.config.time_sync_retry_delay_sec
+                                   : 5;
+    uint32_t total_attempts = (uint32_t)s_state.config.time_sync_retry_attempts + 1U;
+
+    bool synced = false;
+    bool start_event_sent = false;
+
+    for (uint32_t attempt = 0; attempt < total_attempts; attempt++) {
+        if (attempt > 0) {
+            ESP_LOGI(TAG, "Time sync retry %u/%u (timeout=%us)",
+                     (unsigned)(attempt + 1U), (unsigned)total_attempts, (unsigned)timeout_sec);
+        }
+
+        esp_err_t ret = time_sync_init(timezone, s_state.config.time_sync_callback);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Time sync init failed: %s", esp_err_to_name(ret));
+            services_emit_event(SERVICES_EVENT_DEGRADED, ret, "time_sync");
+            return;
+        }
+
+        s_state.time_sync_started = true;
+
+        if (!start_event_sent) {
+            services_emit_event(SERVICES_EVENT_STARTING, ESP_OK, "time_sync");
+            start_event_sent = true;
+        }
+
+        if (services_wait_for_time_sync(timeout_sec)) {
+            s_state.time_sync_ready = true;
+            s_state.config.time_synced = true;
+            services_emit_event(SERVICES_EVENT_READY, ESP_OK, "time_sync");
+            synced = true;
+            break;
+        }
+
+        ESP_LOGW(TAG, "Time sync attempt %u/%u timed out",
+                 (unsigned)(attempt + 1U), (unsigned)total_attempts);
+
+        time_sync_deinit();
+        s_state.time_sync_started = false;
+
+        if (attempt + 1U < total_attempts) {
+            ESP_LOGI(TAG, "Retrying SNTP in %u seconds", (unsigned)retry_delay_sec);
+            if (retry_delay_sec > 0) {
+                vTaskDelay(pdMS_TO_TICKS(retry_delay_sec * 1000U));
+            }
+        }
+    }
+
+    if (!synced) {
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_TIMEOUT, "time_sync");
+        if (s_state.config.time_sync_callback != NULL) {
+            s_state.config.time_sync_callback(false, NULL);
+        }
+    }
 }
 
 static void services_start_mdns(void)
@@ -97,11 +222,22 @@ static void services_start_http(void)
         return;
     }
 
-    if (!s_state.config.time_synced) {
+    if (!services_provisioning_bridge_has_https_credentials()) {
+        ESP_LOGW(TAG, "Provisioning hooks unavailable; skipping HTTPS server startup");
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, "http");
+        return;
+    }
+
+    if (!s_state.time_sync_ready && !s_state.config.time_synced) {
         ESP_LOGW(TAG, "Time sync incomplete; HTTPS clients may warn about certificates");
     }
 
-    esp_err_t ret = http_server_start();
+    http_server_config_t http_cfg = {
+        .https_port = s_state.config.https_port,
+        .time_synced = s_state.time_sync_ready || s_state.config.time_synced,
+    };
+
+    esp_err_t ret = http_server_start(&http_cfg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HTTPS server start failed: %s", esp_err_to_name(ret));
         services_emit_event(SERVICES_EVENT_DEGRADED, ret, "http");
@@ -132,9 +268,30 @@ static void services_start_mqtt(void)
         return;
     }
 
-    esp_err_t ret = mqtt_client_init(s_state.config.mqtt_broker_uri,
-                                     s_state.config.mqtt_username,
-                                     s_state.config.mqtt_password);
+    if (!services_provisioning_bridge_has_device_identity()) {
+        ESP_LOGW(TAG, "Provisioning hooks unavailable; skipping MQTT telemetry startup");
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, "mqtt");
+        return;
+    }
+
+    if (!services_provisioning_bridge_has_mqtt_ca()) {
+        ESP_LOGW(TAG, "MQTT CA certificate loader unavailable; skipping MQTT telemetry startup");
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, "mqtt");
+        return;
+    }
+
+    mqtt_telemetry_config_t mqtt_cfg = {
+        .broker_uri = s_state.config.mqtt_broker_uri,
+        .username = s_state.config.mqtt_username,
+        .password = s_state.config.mqtt_password,
+        .publish_interval_sec = s_state.config.mqtt_publish_interval_sec,
+        .busy_backoff_ms = s_state.config.telemetry_busy_backoff_ms,
+        .client_backoff_ms = s_state.config.telemetry_client_backoff_ms,
+        .idle_delay_ms = s_state.config.telemetry_idle_delay_ms,
+        .sensor_ctx = s_state.deps.sensor_pipeline_ctx,
+    };
+
+    esp_err_t ret = mqtt_client_init(&mqtt_cfg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MQTT init failed: %s", esp_err_to_name(ret));
         services_emit_event(SERVICES_EVENT_DEGRADED, ret, "mqtt");
@@ -142,10 +299,6 @@ static void services_start_mqtt(void)
     }
 
     s_state.mqtt_initialized = true;
-
-    if (s_state.config.mqtt_publish_interval_sec > 0) {
-        mqtt_set_telemetry_interval(s_state.config.mqtt_publish_interval_sec);
-    }
 
     ret = mqtt_client_start();
     if (ret != ESP_OK) {
@@ -182,6 +335,8 @@ esp_err_t services_start(const services_config_t *config,
     s_state.listener_ctx = listener_ctx;
     s_state.running = true;
 
+    services_provisioning_bridge_init(s_state.config.provisioning);
+
     ESP_LOGI(TAG, "Services core initializing (HTTP=%d, MQTT=%d, mDNS=%d, time_sync=%d)",
              config->enable_http_server,
              config->enable_mqtt,
@@ -190,6 +345,7 @@ esp_err_t services_start(const services_config_t *config,
 
     services_emit_event(SERVICES_EVENT_STARTING, ESP_OK, NULL);
 
+    services_start_time_sync();
     services_start_mdns();
     services_start_http();
     services_start_mqtt();
@@ -199,7 +355,7 @@ esp_err_t services_start(const services_config_t *config,
     const bool any_enabled = config->enable_http_server || config->enable_mdns ||
                              config->enable_mqtt || config->enable_time_sync;
     const bool any_started = s_state.http_started || s_state.mdns_started ||
-                             s_state.mqtt_started;
+                             s_state.mqtt_started || s_state.time_sync_started;
 
     if (!any_enabled || any_started) {
         services_emit_event(SERVICES_EVENT_READY, ESP_OK, NULL);
@@ -240,6 +396,19 @@ esp_err_t services_stop(void)
         s_state.mqtt_initialized = false;
         services_emit_event(SERVICES_EVENT_STOPPED, ESP_OK, "mqtt");
     }
+
+    if (s_state.time_sync_started) {
+        time_sync_deinit();
+        s_state.time_sync_started = false;
+        s_state.time_sync_ready = false;
+        services_emit_event(SERVICES_EVENT_STOPPED, ESP_OK, "time_sync");
+    }
+
+    if (s_state.deps.boot_event_group != NULL && s_state.deps.degraded_bit != 0) {
+        xEventGroupClearBits(s_state.deps.boot_event_group, s_state.deps.degraded_bit);
+    }
+
+    services_provisioning_bridge_deinit();
 
     s_state.running = false;
     services_emit_event(SERVICES_EVENT_STOPPED, ESP_OK, NULL);

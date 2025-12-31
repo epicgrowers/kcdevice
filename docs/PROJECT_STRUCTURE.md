@@ -15,10 +15,17 @@ kc_device/
 ├── main/                       # Application source code
 │   ├── CMakeLists.txt         # Main component build configuration
 │   ├── main.c                 # Application entry point and orchestration
+│   ├── platform/              # Board-level utilities and hardware helpers
+│   │   ├── chip_info.c/.h          # Logs silicon/chip metadata at boot
+│   │   ├── security.c/.h           # Wraps NVS encryption + eFuse guard rails
+│   │   ├── reset_button.c/.h       # BOOT button handler + long-press reset glue
+│   │   └── i2c_scanner.c/.h        # I2C bus initialization + discovery logging
 │   ├── provisioning/          # Provisioning subsystem
 │   │   ├── provisioning_runner.c/.h  # Stored-credential + BLE orchestration
 │   │   ├── idf_provisioning.c/.h     # ESP-IDF provisioning manager wrapper
 │   │   ├── provisioning_state.c/.h   # Shared provisioning state machine
+│   │   ├── provisioning_wifi_ops.h   # WiFi ops interface injected into provisioning_runner
+│   │   ├── provisioning_wifi_ops_default.c  # Default bridge from ops interface to wifi_manager
 │   │   └── wifi_manager.c/.h         # WiFi connection and NVS storage
 │   ├── sensors/               # Sensor subsystem
 │   │   ├── sensor_boot.c/.h         # Sensor-task launcher + boot glue
@@ -37,6 +44,8 @@ kc_device/
 │
 ├── config/                     # Configuration files
 │   ├── runtime/               # Embedded JSON/TOML overrides consumed at boot
+│   │   ├── services.json      # Core service toggles, MQTT settings, dashboard/time-sync options
+│   │   └── sensor_profiles.json  # Describes expected I2C sensors for developer tooling
 │   ├── sdkconfig.defaults     # Default ESP32-S3 configuration
 │   ├── sdkconfig.esp32c6      # Default ESP32-C6 configuration
 │   └── partitions.csv         # Flash partition table
@@ -47,9 +56,19 @@ kc_device/
 │   └── PROJECT_STRUCTURE.md   # This file
 │
 ├── test/                       # Test files and examples
+│   ├── host/                 # Python host-harness scaffolding
+│   │   ├── README.md        # Execution instructions + coverage roadmap
+│   │   └── test_provisioning_state_stub.py  # Provisioning state machine unit-test skeleton
 │   ├── test_credentials.json  # Sample credentials for testing
-│   ├── test_credentials_examples.txt
-│   └── test_provisioning_state_stub.py  # Host-side provisioning state test scaffolding
+│   └── test_credentials_examples.txt
+│
+├── tools/                     # Developer utilities
+│   ├── generate_runtime_config_hash.py  # Builds runtime_config_hash.h (SHA256 + size metadata)
+│   ├── validate_runtime_config.py       # Stand-alone runtime config validator
+│   ├── mqtt_status_probe.py            # CLI probe for /api/mqtt/status diagnostics
+│   ├── live_diag_report.py             # Combined /api/status + /api/mqtt/status watch-mode reporter
+│   ├── ws_diag.py                      # WebSocket monitor that streams /ws/sensors data (requires websockets pip package)
+│   └── validate_sensor_profiles.py      # Lints sensor profile JSON before flashing
 │
 ├── build_s3/                   # ESP32-S3 build artifacts (gitignored)
 │   ├── kc_device.bin
@@ -90,6 +109,21 @@ kc_device/
 
 ---
 
+#### `platform/` – Board + hardware utilities
+**Purpose**: Collect low-level helpers (chip metadata logs, security hardening, BOOT button, and I2C bring-up) so `main.c` only wires high-level orchestration.
+
+**Responsibilities**:
+- `platform/chip_info.c/.h`: Grab SoC/flash capabilities via ESP-IDF introspection APIs and emit a concise banner for monitor logs.
+- `platform/security.c/.h`: Initialize NVS with optional encryption, validate eFuse state, and surface a single `security_init()` used during Phase 1 of boot.
+- `platform/reset_button.c/.h`: Configure the BOOT/RESET GPIO, debounce presses, and forward long-press callbacks to `boot_reset_button_handler()`.
+- `platform/i2c_scanner.c/.h`: Own I2C driver init, quick diagnostic scans, and fatal error handling when the bus fails to come up.
+
+**Why it exists**:
+- Keeps platform glue away from provisioning/sensor code while still being available to both boot coordinator and services modules through a single include path.
+- Enables future host-side shims or board variants by letting us swap implementations within `platform/` without touching orchestrators.
+
+---
+
 #### `boot/boot_coordinator.c/h`
 **Purpose**: Central boot ownership for shared event groups, sensor/task launches, and readiness waits
 
@@ -113,6 +147,7 @@ kc_device/
 - Kick off long-running work (sensor boot) while provisioning waits for user input.
 - Invoke `idf_provisioning_start()` / `_stop()` and translate the result into a concise `provisioning_outcome_t`.
 - Cache credentials and expose `provisioning_connection_guard_poll()` so reconnection logic stays out of `main.c`.
+- Accept optional `provisioning_wifi_ops_t` hooks so tests (or future transports) can replace `wifi_manager` without leaking its API.
 
 **Key Functions**:
 - `provisioning_run()` - Accepts a `provisioning_plan_t` describing callbacks, event bits, and retry policy.
@@ -130,10 +165,11 @@ kc_device/
 - Generate deterministic BLE service names (`kc-<MAC>`)
 - Register ESP-IDF provisioning, Wi-Fi, and IP event handlers
 - Translate provisioning events into local state-machine updates
-- Invoke `wifi_manager_connect()` when credentials arrive and stop provisioning once Wi-Fi succeeds
+- Hand credentials to the active `provisioning_wifi_ops_t` implementation (default: `wifi_manager`) and stop provisioning once Wi-Fi succeeds
+- Fail fast if the Wi-Fi stack was not initialized by the injected ops implementation (the runner is now the single owner of `esp_wifi_init()`)
 
 **Key Functions**:
-- `idf_provisioning_start()` - Initialize the provisioning manager and start advertising
+- `idf_provisioning_start()` - Initialize the provisioning manager with the supplied Wi-Fi ops table and start advertising
 - `idf_provisioning_stop()` - Stop provisioning and free BLE/BTDM resources
 - `idf_provisioning_is_running()` - Helper for guarding duplicate starts/stops
 - `idf_provisioning_get_service_name()` / `_get_pop()` - Reusable metadata for logging/UI
@@ -301,9 +337,25 @@ kc_device/
 
 **Key Functions**:
 - `http_server_start(const http_server_config_t *)` / `_stop()` – Lifecycle hooks invoked by `services_start()` once TLS assets are in place.
-- `http_handlers_sensors_init()` – Prepares shared mutex/guards so sensor commands can pause the pipeline safely.
+- `http_handlers_sensors_init()` – Registers all sensor HTTP endpoints and prepares the mutex/guards so sensor commands can pause the pipeline safely.
 - `sensor_ws_handler()` / `http_websocket_snapshot_handler()` – Broadcast sensor cache updates to dashboard clients.
 - `web_editor_init_fs()` / `_load_file()` – Guarantee the writable dashboard assets exist before HTTP starts.
+- `/api/mqtt/status` – JSON endpoint backed by `mqtt_connection_controller_get_metrics()` so dashboards (and scripted diagnostics) can observe MQTT state, run flags, reconnect counters, and transition timings without touching firmware internals.
+
+---
+
+#### `services/telemetry`
+**Purpose**: Own MQTT telemetry publishing and any future analytics clients that depend on the sensor pipeline.
+
+**Responsibilities**:
+- `mqtt_telemetry.c/.h` handle MQTT client lifecycle (init, supervisor task, publish task, command handlers) and interact with the provisioning bridge for TLS assets and device identity.
+- `mqtt_payload_builder.c/.h` turns `sensor_pipeline_snapshot_t` data into the JSON blob published to `kannacloud/sensor/<device_id>/data`, letting the main telemetry task focus on scheduling.
+- `mqtt_connection_controller.c/.h` owns the supervisor loop plus connection state, keeping start/stop/retry logic (and its metrics) isolated from the publish task.
+
+**Key Functions**:
+- `mqtt_client_init()` / `mqtt_client_start()` – Configure the ESP-IDF MQTT client with TLS credentials, launch supervisor/publish tasks, and honor runtime-config overrides.
+- `mqtt_payload_build()` – Produce the JSON payload (device metadata, per-sensor values, battery percentage, RSSI, etc.) used by MQTT publishes.
+- `mqtt_connection_controller_get_metrics()` – Snapshot MQTT state (run flag, reconnect count, consecutive failures, last transition timestamp) for dashboards or diagnostics without poking into telemetry internals.
 
 ---
 
@@ -376,7 +428,9 @@ rebuild. Supported fields:
   },
   "time_sync": {
     "timezone": "UTC",
-    "timeout_sec": 10
+    "timeout_sec": 30,
+    "retry_attempts": 2,
+    "retry_delay_sec": 15
   }
 }
 ```
@@ -443,6 +497,11 @@ This document - explains file organization and responsibilities.
 
 ## Test Files (`test/`)
 
+### `host/`
+- `README.md`: Explains how to run the Python discovery command (`python -m unittest discover -s test/host`) and tracks the coverage roadmap for stored-credential reuse, BLE happy paths, Wi-Fi failures, and connection-guard retries.
+- `provisioning_sim.py`: Lightweight simulator that mirrors the provisioning state machine so unit tests can validate orchestration logic off-target.
+- `test_provisioning_state_stub.py`: Active `unittest.TestCase` suite backed by the simulator. It currently validates stored-credential reuse, BLE provisioning success, Wi-Fi auth failures, and reconnection-guard events.
+
 ### `test_credentials.json`
 Sample WiFi credentials for testing:
 ```json
@@ -460,14 +519,22 @@ Multiple credential format examples:
 
 **Note**: These are for development only. Never commit real credentials.
 
-### `test_provisioning_state_stub.py`
-Host-side Python `unittest` skeleton that documents the provisioning state-machine
-scenarios (`stored credentials`, `BLE happy path`, `auth failure`, `connection
-guard`). Each test is currently skipped until the provisioning package exposes
-mockable hooks, but contributors now have a canonical landing zone for future
-assertions.
-
 ---
+
+## Developer Tools (`tools/`)
+
+### `generate_runtime_config_hash.py`
+- Consumes `config/runtime/services.json` and `config/runtime/api_keys.json` and produces `build_s3/esp-idf/main/generated/runtime_config_hash.h` (SHA256 digests + byte sizes).
+- Invoked automatically by `main/CMakeLists.txt` (both `idf.py build` and `build.ps1` depend on it) but can also be run directly for debugging.
+- Lives alongside other future developer utilities so scripting stays out of the `main/` tree.
+
+### `validate_runtime_config.py`
+- Stand-alone linter for the embedded JSON blobs. Run `python tools/validate_runtime_config.py` to verify the same constraints enforced by `build.ps1` (HTTPS port > 0, MQTT credentials present when enabled, dashboard/mDNS constraints, time-sync bounds, API-key schema).
+- Supports `--services` / `--api-keys` flags for alternate paths plus `--require-api-keys` to force validation even when the file is absent.
+
+### `validate_sensor_profiles.py`
+- Validates `config/runtime/sensor_profiles.json` before flashing so duplicate I2C addresses, unsupported channel names, or unknown sensor types are caught without touching firmware builds.
+- Run `python tools/validate_sensor_profiles.py` (or pass `--profiles <path>`) to lint custom stacks when adding new Atlas sensors or editing addresses.
 
 ## Build Output (`build/`)
 

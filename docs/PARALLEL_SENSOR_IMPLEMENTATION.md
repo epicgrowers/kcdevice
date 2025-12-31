@@ -18,6 +18,8 @@ This document provides the specific code changes needed to implement parallel se
 
 ## Implementation Steps
 
+> **Note:** The current firmware calls `idf_provisioning_start()` with the active `provisioning_wifi_ops_t` (default: `wifi_manager`). Legacy snippets below show the older zero-argument call; replace it with `idf_provisioning_start(provisioning_get_wifi_ops())` (or an equivalent pointer) when applying these steps.
+
 ### Step 1: Modify main.c - Provisioning Section
 
 **File**: `main/main.c`  
@@ -30,7 +32,7 @@ if (!connected) {
     const char *service_name = idf_provisioning_get_service_name();
     ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
 
-    ret = idf_provisioning_start();
+    ret = idf_provisioning_start(provisioning_get_wifi_ops());
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
         return;
@@ -105,7 +107,7 @@ if (!connected) {
     }
 
     // Start BLE provisioning
-    ret = idf_provisioning_start();
+    ret = idf_provisioning_start(provisioning_get_wifi_ops());
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
         return;

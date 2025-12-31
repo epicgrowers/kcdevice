@@ -57,6 +57,7 @@ void boot_coordinator_prepare_sensor_pipeline(const boot_coordinator_t *coordina
 
 void boot_coordinator_configure_network_boot(const boot_coordinator_t *coordinator,
                                              EventBits_t ready_bit,
+                                             EventBits_t degraded_bit,
                                              network_boot_config_t *out_config)
 {
     if (out_config == NULL) {
@@ -64,6 +65,7 @@ void boot_coordinator_configure_network_boot(const boot_coordinator_t *coordinat
     }
 
     configure_common(coordinator, ready_bit, &out_config->event_group, &out_config->ready_bit);
+    out_config->degraded_bit = degraded_bit;
 }
 
 EventBits_t boot_coordinator_wait_bits(const boot_coordinator_t *coordinator,

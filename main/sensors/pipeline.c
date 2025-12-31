@@ -69,7 +69,7 @@ static void sensor_pipeline_cache_listener(const sensor_cache_t *cache, void *us
 
     sensor_pipeline_snapshot_t snapshot = {0};
     populate_readiness(ctx, &snapshot.readiness);
-    snapshot.reading_interval_sec = ctx->reading_interval_sec;
+    snapshot.reading_interval_sec = sensor_manager_get_reading_interval();
     if (cache != NULL) {
         snapshot.cache = *cache;
         snapshot.cache_valid = true;
@@ -156,7 +156,7 @@ esp_err_t sensor_pipeline_snapshot(const sensor_pipeline_launch_ctx_t *ctx,
 
     memset(out_snapshot, 0, sizeof(*out_snapshot));
     populate_readiness(resolved, &out_snapshot->readiness);
-    out_snapshot->reading_interval_sec = resolved->reading_interval_sec;
+    out_snapshot->reading_interval_sec = sensor_manager_get_reading_interval();
 
     sensor_cache_t cache = {0};
     esp_err_t cache_ret = sensor_manager_get_cached_data(&cache);

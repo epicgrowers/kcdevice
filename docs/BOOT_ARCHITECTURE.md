@@ -97,6 +97,8 @@ If valid WiFi credentials exist in NVS, this phase is **completely skipped** and
 └─ Log: "Provisioning started (service kc-XXXXXX)"
 
 NOTE: Sensor task runs independently in background!
+
+> **Implementation detail:** The real call is `idf_provisioning_start(provisioning_get_wifi_ops())` so BLE provisioning shares the same Wi-Fi implementation as stored-credential boots. The shorthand `idf_provisioning_start()` is used below for readability.
 ```
 
 **BLE Configuration**:
@@ -536,7 +538,7 @@ if (!connected) {
     const char *service_name = idf_provisioning_get_service_name();
     ESP_LOGI(TAG, "MAIN: Starting ESP-IDF BLE provisioning (service=%s)", service_name);
 
-    ret = idf_provisioning_start();
+    ret = idf_provisioning_start(provisioning_get_wifi_ops());
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
         return;
@@ -597,7 +599,7 @@ if (!connected) {
         ESP_LOGI(TAG, "MAIN: ✓ Sensor task launched (priority %d)", SENSOR_TASK_PRIORITY);
     }
 
-    ret = idf_provisioning_start();
+    ret = idf_provisioning_start(provisioning_get_wifi_ops());
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MAIN: Failed to start provisioning: %s", esp_err_to_name(ret));
         return;
@@ -757,7 +759,7 @@ void app_main(void) {
         xTaskCreate(sensor_task, ...);
         
         // Start BLE provisioning
-        idf_provisioning_start();
+        idf_provisioning_start(provisioning_get_wifi_ops());
         
         log_memory_usage("During provisioning + sensors");
         

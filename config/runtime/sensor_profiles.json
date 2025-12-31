@@ -1,0 +1,35 @@
+{
+  "profiles": [
+    {
+      "name": "atlas_default",
+      "description": "Default Atlas Scientific sensor stack used on the KC-Device reference hardware.",
+      "sensors": [
+        {
+          "type": "EZO_ORP",
+          "address": "0x16",
+          "channels": ["orp"]
+        },
+        {
+          "type": "EZO_DO",
+          "address": "0x63",
+          "channels": ["dissolved_oxygen", "saturation"]
+        },
+        {
+          "type": "EZO_EC",
+          "address": "0x64",
+          "channels": ["conductivity", "tds", "salinity", "specific_gravity"]
+        },
+        {
+          "type": "EZO_RTD",
+          "address": "0x66",
+          "channels": ["temperature"]
+        },
+        {
+          "type": "EZO_HUM",
+          "address": "0x6F",
+          "channels": ["humidity", "air_temp", "dew_point"]
+        }
+      ]
+    }
+  ]
+}

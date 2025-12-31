@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "provisioning/provisioning_wifi_ops.h"
 
 /**
  * @brief Callback fired when provisioning enters the BLE phase.
@@ -18,6 +19,7 @@ typedef struct {
     provisioning_parallel_cb_t on_parallel_work_start;
     void *on_parallel_work_ctx;
     bool attempt_stored_credentials_first;
+    const provisioning_wifi_ops_t *wifi_ops;
 } provisioning_plan_t;
 
 typedef struct {

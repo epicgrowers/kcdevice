@@ -19,3 +19,4 @@
 // Event bits for boot coordination
 #define SENSORS_READY_BIT              BIT0
 #define NETWORK_READY_BIT              BIT1
+#define NETWORK_DEGRADED_BIT           BIT2

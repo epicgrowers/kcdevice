@@ -1,11 +1,13 @@
 #include "network_boot.h"
 
-#include "api_key_manager.h"
+#include "services/keys/api_key_manager.h"
 #include "boot/boot_config.h"
 #include "boot/boot_monitor.h"
-#include "cloud_provisioning.h"
+#include "services/provisioning/cloud_provisioning.h"
 #include "services/core/services.h"
-#include "services/time_sync/time_sync.h"
+#include "services/core/services_config.h"
+#include "config/runtime_config.h"
+#include "sensors/pipeline.h"
 #include "provisioning/provisioning_runner.h"
 #include "freertos/task.h"
 #include "esp_err.h"
@@ -27,9 +29,64 @@ typedef struct {
     bool http_degraded;
     bool mdns_degraded;
     bool mqtt_degraded;
+    bool time_sync_ready;
+    bool time_sync_degraded;
 } services_observer_t;
 
 static services_observer_t s_services_observer = {0};
+
+static esp_err_t provisioning_load_https_cert(void *ctx, char *buffer, size_t *length)
+{
+    (void)ctx;
+    return cloud_prov_get_certificate(buffer, length);
+}
+
+static esp_err_t provisioning_load_https_key(void *ctx, char *buffer, size_t *length)
+{
+    (void)ctx;
+    return cloud_prov_get_private_key(buffer, length);
+}
+
+static esp_err_t provisioning_load_mqtt_ca(void *ctx, char *buffer, size_t *length)
+{
+    (void)ctx;
+    return cloud_prov_get_mqtt_ca_cert(buffer, length);
+}
+
+static esp_err_t provisioning_load_device_id(void *ctx, char *buffer, size_t length)
+{
+    (void)ctx;
+    return cloud_prov_get_device_id(buffer, length);
+}
+
+static esp_err_t provisioning_load_device_name(void *ctx, char *buffer, size_t length)
+{
+    (void)ctx;
+    return cloud_prov_get_device_name(buffer, length);
+}
+
+static esp_err_t provisioning_set_device_name(void *ctx, const char *value)
+{
+    (void)ctx;
+    return cloud_prov_set_device_name(value);
+}
+
+static esp_err_t provisioning_clear_device_name(void *ctx)
+{
+    (void)ctx;
+    return cloud_prov_clear_device_name();
+}
+
+static const services_provisioning_api_t s_cloud_prov_api = {
+    .load_https_certificate = provisioning_load_https_cert,
+    .load_https_private_key = provisioning_load_https_key,
+    .load_mqtt_ca_certificate = provisioning_load_mqtt_ca,
+    .load_device_id = provisioning_load_device_id,
+    .load_device_name = provisioning_load_device_name,
+    .set_device_name = provisioning_set_device_name,
+    .clear_device_name = provisioning_clear_device_name,
+    .ctx = NULL,
+};
 
 static void log_time_sync(bool synced, struct tm *current_time)
 {
@@ -60,6 +117,23 @@ static void log_cloud_provision(bool success, const char *message)
     }
 }
 
+static void services_fault_handler(const services_status_event_t *event, void *ctx)
+{
+    (void)ctx;
+
+    if (event == NULL) {
+        return;
+    }
+
+    const char *component = (event->component != NULL) ? event->component : "core";
+    const char *result_name = esp_err_to_name(event->result);
+    ESP_LOGW(TAG, "NETWORK: escalating degraded service %s (%s)", component, result_name);
+
+    char detail[96];
+    snprintf(detail, sizeof(detail), "%s degraded (%s)", component, result_name);
+    boot_monitor_publish("network_fault", detail);
+}
+
 static void services_status_listener(const services_status_event_t *event, void *ctx)
 {
     if (event == NULL) {
@@ -84,6 +158,8 @@ static void services_status_listener(const services_status_event_t *event, void 
                     observer->mdns_ready = true;
                 } else if (strcmp(component, "mqtt") == 0) {
                     observer->mqtt_ready = true;
+                } else if (strcmp(component, "time_sync") == 0) {
+                    observer->time_sync_ready = true;
                 }
             }
             break;
@@ -97,6 +173,8 @@ static void services_status_listener(const services_status_event_t *event, void 
                     observer->mdns_degraded = true;
                 } else if (strcmp(component, "mqtt") == 0) {
                     observer->mqtt_degraded = true;
+                } else if (strcmp(component, "time_sync") == 0) {
+                    observer->time_sync_degraded = true;
                 }
             }
             break;
@@ -121,7 +199,6 @@ static void network_task(void *arg)
 
     esp_err_t ret;
     bool tls_ready = false;
-    bool time_synced = false;
 
     if (!provisioning_wifi_is_connected()) {
         ESP_LOGW(TAG, "NETWORK: WiFi not connected, waiting...");
@@ -139,26 +216,6 @@ static void network_task(void *arg)
     }
 
     ESP_LOGI(TAG, "NETWORK: \u2713 WiFi connected");
-
-    ESP_LOGI(TAG, "NETWORK: Initializing NTP time synchronization...");
-    ret = time_sync_init(NULL, log_time_sync);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "NETWORK: Failed to initialize time sync: %s", esp_err_to_name(ret));
-    }
-
-    ESP_LOGI(TAG, "NETWORK: Waiting for time synchronization...");
-    int sync_wait = 0;
-    while (!time_sync_is_synced() && sync_wait < 10) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        sync_wait++;
-    }
-
-    time_synced = time_sync_is_synced();
-    if (!time_synced) {
-        ESP_LOGW(TAG, "NETWORK: Time sync timeout, TLS may fail");
-    } else {
-        ESP_LOGI(TAG, "NETWORK: Time synchronized successfully");
-    }
 
     ESP_LOGI(TAG, "NETWORK: Initializing API key manager...");
     api_key_manager_init();
@@ -196,30 +253,28 @@ static void network_task(void *arg)
         ESP_LOGI(TAG, "NETWORK: TLS certificates verified");
     }
 
-    const char *mqtt_broker = "mqtts://mqtt.kannacloud.com:8883";
-    const char *mqtt_username = "sensor01";
-    const char *mqtt_password = "xkKKYQWxiT83Ni3";
-
     memset(&s_services_observer, 0, sizeof(s_services_observer));
+    services_config_t services_cfg;
+    services_config_load_defaults(&services_cfg);
 
-    services_config_t services_cfg = {
-        .enable_http_server = tls_ready,
-        .enable_mqtt = tls_ready,
-        .enable_mdns = tls_ready,
-        .enable_time_sync = time_synced,
-        .tls_ready = tls_ready,
-        .time_synced = time_synced,
-        .https_port = 443,
-        .mqtt_publish_interval_sec = 0,
-        .mqtt_broker_uri = mqtt_broker,
-        .mqtt_username = mqtt_username,
-        .mqtt_password = mqtt_password,
-        .mdns_hostname = "kc",
-        .mdns_instance_name = "KannaCloud Device",
-        .timezone = NULL,
-        .time_sync_callback = NULL,
-        .time_sync_timeout_sec = 10,
-    };
+    services_cfg.enable_http_server = tls_ready;
+    services_cfg.enable_mqtt = tls_ready;
+    services_cfg.enable_mdns = tls_ready;
+
+    esp_err_t runtime_cfg_ret = runtime_config_apply_services_overrides(&services_cfg);
+    if (runtime_cfg_ret != ESP_OK) {
+        ESP_LOGW(TAG, "NETWORK: Runtime services overrides failed: %s", esp_err_to_name(runtime_cfg_ret));
+    }
+
+    services_cfg.tls_ready = tls_ready;
+    services_cfg.time_sync_callback = log_time_sync;
+    services_cfg.provisioning = &s_cloud_prov_api;
+
+    if (!tls_ready) {
+        services_cfg.enable_http_server = false;
+        services_cfg.enable_mqtt = false;
+        services_cfg.enable_mdns = false;
+    }
 
 #ifdef CONFIG_IDF_TARGET_ESP32C6
     services_cfg.enable_http_server = false;
@@ -229,7 +284,10 @@ static void network_task(void *arg)
     services_dependencies_t services_deps = {
         .boot_event_group = s_network_boot_config.event_group,
         .network_ready_bit = s_network_boot_config.ready_bit,
-        .sensor_pipeline_ctx = NULL,
+        .degraded_bit = s_network_boot_config.degraded_bit,
+        .sensor_pipeline_ctx = sensor_pipeline_get_active_ctx(),
+        .fault_handler = services_fault_handler,
+        .fault_handler_ctx = NULL,
     };
 
     ret = services_start(&services_cfg, &services_deps, services_status_listener, &s_services_observer);
@@ -273,10 +331,19 @@ static void network_task(void *arg)
         }
     }
 
+    const char *ntp_detail = services_cfg.enable_time_sync ? "pending" : "disabled";
+    if (!services_cfg.enable_time_sync) {
+        ntp_detail = "disabled";
+    } else if (s_services_observer.time_sync_ready) {
+        ntp_detail = "synced";
+    } else if (s_services_observer.time_sync_degraded) {
+        ntp_detail = "timeout";
+    }
+
     snprintf(network_detail, sizeof(network_detail),
              "tls=%s ntp=%s mqtt=%s https=%s",
              tls_ready ? "ready" : "missing",
-             time_synced ? "synced" : "timeout",
+             ntp_detail,
              mqtt_detail,
              https_detail);
 #else
@@ -287,10 +354,17 @@ static void network_task(void *arg)
                                                                                : "pending"))
                                   : (services_cfg.tls_ready ? "disabled" : "skipped");
 
+    const char *ntp_detail = services_cfg.enable_time_sync
+                                  ? (s_services_observer.time_sync_ready
+                                         ? "synced"
+                                         : (s_services_observer.time_sync_degraded ? "timeout"
+                                                                                   : "pending"))
+                                  : "disabled";
+
     snprintf(network_detail, sizeof(network_detail),
              "tls=%s ntp=%s mqtt=%s https=disabled",
              tls_ready ? "ready" : "missing",
-             time_synced ? "synced" : "timeout",
+             ntp_detail,
              mqtt_detail);
 #endif
     boot_monitor_publish("network_ready", network_detail);

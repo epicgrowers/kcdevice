@@ -7,6 +7,7 @@
 #define MQTT_TELEMETRY_H
 
 #include "esp_err.h"
+#include "sensors/pipeline.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -82,17 +83,24 @@ typedef struct {
  */
 esp_err_t mqtt_refresh_device_name(void);
 
+typedef struct {
+    const char *broker_uri;
+    const char *username;
+    const char *password;
+    uint32_t publish_interval_sec;
+    uint32_t busy_backoff_ms;
+    uint32_t client_backoff_ms;
+    uint32_t idle_delay_ms;
+    const sensor_pipeline_launch_ctx_t *sensor_ctx;
+} mqtt_telemetry_config_t;
+
 /**
  * @brief Initialize MQTT client
- * 
- * Connects to MQTT broker specified in menuconfig
- * 
- * @param broker_uri MQTT broker URI (e.g., "mqtt://broker.example.com:1883" or "mqtts://broker.example.com:8883")
- * @param username MQTT username (NULL if no authentication required)
- * @param password MQTT password (NULL if no authentication required)
+ *
+ * @param config Initialization parameters (broker URI, credentials, provisioning hooks)
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t mqtt_client_init(const char *broker_uri, const char *username, const char *password);
+esp_err_t mqtt_client_init(const mqtt_telemetry_config_t *config);
 
 /**
  * @brief Start MQTT client and connect to broker

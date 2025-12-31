@@ -3,7 +3,7 @@
 #include "boot/boot_config.h"
 #include "boot/boot_monitor.h"
 #include "freertos/task.h"
-#include "i2c_scanner.h"
+#include "platform/i2c_scanner.h"
 #include "sensor_manager.h"
 #include "sensors/config.h"
 #include "esp_log.h"

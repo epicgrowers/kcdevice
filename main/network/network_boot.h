@@ -11,6 +11,7 @@ extern "C" {
 typedef struct {
     EventGroupHandle_t event_group;
     EventBits_t ready_bit;
+    EventBits_t degraded_bit;
 } network_boot_config_t;
 
 esp_err_t network_boot_start(const network_boot_config_t *config);

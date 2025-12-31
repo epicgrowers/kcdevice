@@ -2,9 +2,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <limits.h>
 #include <string.h>
 #include "cJSON.h"
 #include "esp_log.h"
+#include "runtime_config_hash.h"
 
 extern const uint8_t config_runtime_services_json_start[] asm("_binary_services_json_start");
 extern const uint8_t config_runtime_services_json_end[] asm("_binary_services_json_end");
@@ -26,8 +28,20 @@ typedef struct {
     uint16_t https_port;
     bool mqtt_interval_present;
     uint32_t mqtt_interval_sec;
+    bool telemetry_interval_present;
+    uint32_t telemetry_publish_interval_sec;
+    bool telemetry_busy_backoff_present;
+    uint32_t telemetry_busy_backoff_ms;
+    bool telemetry_client_backoff_present;
+    uint32_t telemetry_client_backoff_ms;
+    bool telemetry_idle_delay_present;
+    uint32_t telemetry_idle_delay_ms;
     bool time_sync_timeout_present;
     uint32_t time_sync_timeout_sec;
+    bool time_sync_retry_attempts_present;
+    uint32_t time_sync_retry_attempts;
+    bool time_sync_retry_delay_present;
+    uint32_t time_sync_retry_delay_sec;
     bool mqtt_broker_uri_present;
     char mqtt_broker_uri[128];
     bool mqtt_username_present;
@@ -44,6 +58,12 @@ typedef struct {
 
 static const char *TAG = "RUNTIME_CFG";
 static runtime_services_overrides_t s_overrides = {0};
+static const runtime_config_digest_t s_runtime_digests = {
+    .services_sha256 = RUNTIME_CONFIG_SERVICES_SHA256,
+    .api_keys_sha256 = RUNTIME_CONFIG_API_KEYS_SHA256,
+    .services_size_bytes = RUNTIME_CONFIG_SERVICES_SIZE_BYTES,
+    .api_keys_size_bytes = RUNTIME_CONFIG_API_KEYS_SIZE_BYTES,
+};
 
 static void runtime_copy_string(char *dest, size_t dest_size, const char *src)
 {
@@ -170,6 +190,20 @@ static esp_err_t runtime_parse_overrides(void)
         s_overrides.mqtt_password_present = runtime_get_string(mqtt, "password", s_overrides.mqtt_password, sizeof(s_overrides.mqtt_password));
     }
 
+    cJSON *telemetry = cJSON_GetObjectItemCaseSensitive(root, "telemetry");
+    if (cJSON_IsObject(telemetry)) {
+        s_overrides.telemetry_interval_present =
+            runtime_get_uint32(telemetry, "publish_interval_sec", &s_overrides.telemetry_publish_interval_sec);
+        s_overrides.telemetry_busy_backoff_present =
+            runtime_get_uint32(telemetry, "busy_backoff_ms", &s_overrides.telemetry_busy_backoff_ms);
+        s_overrides.telemetry_client_backoff_present =
+            runtime_get_uint32(telemetry, "client_backoff_ms", &s_overrides.telemetry_client_backoff_ms);
+        s_overrides.telemetry_idle_delay_present =
+            runtime_get_uint32(telemetry, "idle_delay_ms", &s_overrides.telemetry_idle_delay_ms);
+    } else if (s_overrides.mqtt_interval_present) {
+        ESP_LOGW(TAG, "mqtt.publish_interval_sec is deprecated; move to telemetry.publish_interval_sec");
+    }
+
     cJSON *dashboard = cJSON_GetObjectItemCaseSensitive(root, "dashboard");
     if (cJSON_IsObject(dashboard)) {
         s_overrides.mdns_hostname_present = runtime_get_string(dashboard, "mdns_hostname", s_overrides.mdns_hostname, sizeof(s_overrides.mdns_hostname));
@@ -180,6 +214,8 @@ static esp_err_t runtime_parse_overrides(void)
     if (cJSON_IsObject(time_sync)) {
         s_overrides.timezone_present = runtime_get_string(time_sync, "timezone", s_overrides.timezone, sizeof(s_overrides.timezone));
         s_overrides.time_sync_timeout_present = runtime_get_uint32(time_sync, "timeout_sec", &s_overrides.time_sync_timeout_sec);
+        s_overrides.time_sync_retry_attempts_present = runtime_get_uint32(time_sync, "retry_attempts", &s_overrides.time_sync_retry_attempts);
+        s_overrides.time_sync_retry_delay_present = runtime_get_uint32(time_sync, "retry_delay_sec", &s_overrides.time_sync_retry_delay_sec);
     }
 
     cJSON_Delete(root);
@@ -223,12 +259,38 @@ esp_err_t runtime_config_apply_services_overrides(services_config_t *config)
         config->https_port = s_overrides.https_port;
     }
 
-    if (s_overrides.mqtt_interval_present) {
+    if (s_overrides.telemetry_interval_present) {
+        config->mqtt_publish_interval_sec = s_overrides.telemetry_publish_interval_sec;
+    } else if (s_overrides.mqtt_interval_present) {
         config->mqtt_publish_interval_sec = s_overrides.mqtt_interval_sec;
+    }
+
+    if (s_overrides.telemetry_busy_backoff_present) {
+        config->telemetry_busy_backoff_ms = s_overrides.telemetry_busy_backoff_ms;
+    }
+
+    if (s_overrides.telemetry_client_backoff_present) {
+        config->telemetry_client_backoff_ms = s_overrides.telemetry_client_backoff_ms;
+    }
+
+    if (s_overrides.telemetry_idle_delay_present) {
+        config->telemetry_idle_delay_ms = s_overrides.telemetry_idle_delay_ms;
     }
 
     if (s_overrides.time_sync_timeout_present) {
         config->time_sync_timeout_sec = s_overrides.time_sync_timeout_sec;
+    }
+
+    if (s_overrides.time_sync_retry_attempts_present) {
+        uint32_t attempts = s_overrides.time_sync_retry_attempts;
+        if (attempts > UINT8_MAX) {
+            attempts = UINT8_MAX;
+        }
+        config->time_sync_retry_attempts = (uint8_t)attempts;
+    }
+
+    if (s_overrides.time_sync_retry_delay_present) {
+        config->time_sync_retry_delay_sec = s_overrides.time_sync_retry_delay_sec;
     }
 
     if (s_overrides.mqtt_broker_uri_present) {
@@ -256,4 +318,9 @@ esp_err_t runtime_config_apply_services_overrides(services_config_t *config)
     }
 
     return ESP_OK;
+}
+
+const runtime_config_digest_t *runtime_config_get_digest(void)
+{
+    return &s_runtime_digests;
 }

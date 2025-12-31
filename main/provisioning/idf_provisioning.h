@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include <stdbool.h>
+#include "provisioning/provisioning_wifi_ops.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,7 +11,7 @@ extern "C" {
 /**
  * @brief Start ESP-IDF BLE Wi-Fi provisioning using Security 1 (PoP required).
  */
-esp_err_t idf_provisioning_start(void);
+esp_err_t idf_provisioning_start(const provisioning_wifi_ops_t *wifi_ops);
 
 /**
  * @brief Stop provisioning service if running and reclaim BLE resources.

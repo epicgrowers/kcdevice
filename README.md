@@ -88,9 +88,9 @@ Key runtime facts:
 ## Provisioning Flow
 
 1. `provisioning_run()` initializes `wifi_manager` and attempts stored credentials (if configured)
-2. Failure or no credentials -> `idf_provisioning_start()` launches the ESP-IDF provisioning manager
+2. Failure or no credentials -> `idf_provisioning_start()` launches the ESP-IDF provisioning manager with the selected `provisioning_wifi_ops_t` (it now fails fast if that ops table hasn't initialized the Wi-Fi stack yet)
 3. User connects via app, enters PoP, and sends SSID/password
-4. `wifi_manager_connect()`/ESP-IDF provisioning flow applies creds, saves them to NVS upon DHCP success, and tears down BLE
+4. The configured Wi-Fi ops (`wifi_manager` by default) applies creds, saves them to NVS upon DHCP success, and tears down BLE
 5. `provisioning_connection_guard_poll()` keeps Wi-Fi healthy while the rest of the system (cloud/time-sync/HTTPS/MQTT) waits on readiness bits
 
 ## Maintenance Notes

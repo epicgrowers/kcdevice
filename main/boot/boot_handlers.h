@@ -1,7 +1,7 @@
 #pragma once
 
 #include "provisioning/provisioning_state.h"
-#include "reset_button.h"
+#include "platform/reset_button.h"
 
 #ifdef __cplusplus
 extern "C" {

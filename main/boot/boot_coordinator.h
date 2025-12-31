@@ -28,6 +28,7 @@ void boot_coordinator_prepare_sensor_pipeline(const boot_coordinator_t *coordina
 
 void boot_coordinator_configure_network_boot(const boot_coordinator_t *coordinator,
                                              EventBits_t ready_bit,
+                                             EventBits_t degraded_bit,
                                              network_boot_config_t *out_config);
 
 EventBits_t boot_coordinator_wait_bits(const boot_coordinator_t *coordinator,
