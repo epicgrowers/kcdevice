@@ -142,7 +142,7 @@ _Status 2025-12-30_: **Completed** – chip metadata logging, security init, res
 
 ### Segment 7 – Developer Tooling & Host Harness
 
-_Status 2025-12-30_: **In progress** – `test/host/` now contains the provisioning simulator + active `unittest` coverage (stored credentials, BLE happy path, auth failure, reconnection guard), `docs/PROJECT_STRUCTURE.md` / `docs/README.md` describe the host harness plus runtime-config tooling, `services/telemetry/mqtt_connection_controller.c` owns connection/retry state outside `mqtt_telemetry.c` and now exposes metrics snapshots (state/run flag/reconnect counters/timestamps), and `tools/validate_sensor_profiles.py` lints the new `config/runtime/sensor_profiles.json`. Remaining work centers on deeper MQTT task splits (connection scheduling vs. publishing) and additional host/dev tooling.
+_Status 2025-12-31_: **Completed** – `test/host/` now contains the provisioning simulator + active `unittest` coverage (stored credentials, BLE happy path, auth failure, reconnection guard), `docs/PROJECT_STRUCTURE.md` / `docs/README.md` describe the host harness plus runtime-config tooling, `services/telemetry/mqtt_connection_controller.c` owns connection/retry state outside `mqtt_telemetry.c` and now exposes metrics snapshots (state/run flag/reconnect counters/timestamps), `tools/validate_sensor_profiles.py` lints the new `config/runtime/sensor_profiles.json`, and the latest evaluation confirmed the MQTT helper split + host tooling backlog are sufficient for the current telemetry scope.
 
 **Goal**: Turn the “future cleanups” list into actionable deliverables by organizing host-side tests and documenting the tooling required to validate runtime configs outside the firmware build.
 
