@@ -977,6 +977,26 @@ esp_err_t mqtt_trigger_immediate_publish(void)
     return ESP_OK;
 }
 
+void mqtt_telemetry_get_diagnostics(mqtt_telemetry_diagnostics_t *out_diag)
+{
+    if (out_diag == NULL) {
+        return;
+    }
+
+    memset(out_diag, 0, sizeof(*out_diag));
+    telemetry_pipeline_get_metrics(&s_telemetry_pipeline, &out_diag->pipeline_metrics);
+    out_diag->publish_interval_sec = s_publish_interval_sec;
+    out_diag->busy_backoff_ms = s_publish_loop_config.busy_backoff_ms;
+    out_diag->client_backoff_ms = s_publish_loop_config.client_backoff_ms;
+    out_diag->idle_delay_ms = s_publish_loop_config.idle_delay_ms;
+
+    out_diag->interval_enabled = (s_publish_scheduler.interval_sec > 0);
+    out_diag->manual_request_pending = s_publish_scheduler.manual_request;
+    out_diag->publish_queue_depth = s_publish_scheduler.manual_request ? 1U : 0U;
+    out_diag->scheduler_last_publish_us = s_publish_scheduler.last_publish_us;
+    out_diag->scheduler_next_retry_us = s_publish_scheduler.next_retry_us;
+}
+
 esp_err_t mqtt_get_device_id(char *device_id, size_t size)
 {
     if (device_id == NULL || size == 0) {

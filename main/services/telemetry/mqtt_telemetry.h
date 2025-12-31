@@ -8,6 +8,7 @@
 
 #include "esp_err.h"
 #include "sensors/pipeline.h"
+#include "services/telemetry/telemetry_pipeline.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -93,6 +94,19 @@ typedef struct {
     uint32_t idle_delay_ms;
     const sensor_pipeline_launch_ctx_t *sensor_ctx;
 } mqtt_telemetry_config_t;
+
+typedef struct {
+    telemetry_pipeline_metrics_t pipeline_metrics;
+    uint32_t publish_interval_sec;
+    uint32_t busy_backoff_ms;
+    uint32_t client_backoff_ms;
+    uint32_t idle_delay_ms;
+    bool interval_enabled;
+    bool manual_request_pending;
+    uint32_t publish_queue_depth;
+    int64_t scheduler_last_publish_us;
+    int64_t scheduler_next_retry_us;
+} mqtt_telemetry_diagnostics_t;
 
 /**
  * @brief Initialize MQTT client
@@ -222,6 +236,8 @@ uint32_t mqtt_get_telemetry_interval(void);
  * @return ESP_OK on success, ESP_ERR_INVALID_STATE if task not running
  */
 esp_err_t mqtt_trigger_immediate_publish(void);
+
+void mqtt_telemetry_get_diagnostics(mqtt_telemetry_diagnostics_t *out_diag);
 
 /**
  * @brief Get device ID for MQTT topics

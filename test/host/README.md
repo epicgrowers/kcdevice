@@ -26,3 +26,13 @@ Add new tests or extend the simulator as we expose more host-callable hooks (e.g
 3. The synthetic HTTP payload matches what the on-device handler returns (state codes, timers, and counters).
 
 Use this harness when validating new watchdog heuristics or when tweaking the HTTP diagnostic surface without reflashing hardware.
+
+## Telemetry scheduler harness
+
+`mqtt_scheduler_sim.py` recreates the telemetry pipeline metrics and MQTT publish scheduler so bursty sample captures, forced disconnects, and payload failures can be tested entirely on the host. The `test_mqtt_scheduler.py` cases assert that:
+
+1. Manual/interval publishes respect the configured cadence even when sensors fire back-to-back.
+2. Forced disconnects increment failure counters and apply the expected retry backoff.
+3. Payload assembly failures update telemetry diagnostics before the next publish attempt.
+
+Reach for this harness whenever the telemetry diagnostics surface or scheduler math changes—you can validate the edge cases without touching hardware logs.

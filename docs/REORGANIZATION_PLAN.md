@@ -170,16 +170,16 @@ _Status 2025-12-30_: **In progress** – `test/host/` now contains the provision
 
 ### Segment 8 – Telemetry Streamlining & Diagnostics
 
-_Status 2025-12-31_: **In progress** – telemetry runtime config (publish interval + loop backoffs) now flows from `config/runtime/services.json` through `services_start()` into `mqtt_telemetry`, and validators/build gating enforce the schema. Remaining work covers the telemetry facade, structured logging, richer diagnostics endpoints, and host tests.
+_Status 2025-12-31_: **Completed** – telemetry runtime config (publish interval + loop backoffs) now flows from `config/runtime/services.json` through `services_start()` into `mqtt_telemetry`, validators/build gating enforce the schema, the telemetry facade + structured logging + expanded diagnostics endpoints are live, host-side scheduler/watchdog harnesses gate regressions, and `docs/TELEMETRY_DIAGNOSTICS.md` captures the `/api/mqtt/status` payload for onboarding.
 
 **Goal**: Finish carving `services/telemetry/` into composable layers (connection controller, publish scheduler, payload builders, diagnostics exporters) and make telemetry health observable without attaching a serial console.
 
 - **Tasks**:
 - [done] Finalize the MQTT telemetry split by moving retry/backoff constants, queue sizing, and interval knobs into a dedicated telemetry block embedded in `config/runtime/services.json`, with runtime loaders + build validation to keep behavior environment-tunable without recompiles.
-- Introduce a `telemetry_pipeline_t` facade that feeds both MQTT and future transports (WebSocket mirror, local buffering) from a single sensor snapshot source, eliminating direct `sensor_manager` calls from telemetry workers.
-- Add structured logging helpers (`telemetry_log_publish_attempt()`, `telemetry_log_drop_reason()`) to replace ad-hoc `ESP_LOGI` calls and ensure every publish attempt includes payload digest, sensor snapshot ID, and connection state.
-- Expand `/api/mqtt/status` (or add `/api/telemetry/status`) with queue depth, last-publish timestamp, and watchdog fault counts so dashboards can highlight stalled telemetry without reading logs.
-- Build host-side regression tests (`test/host/test_mqtt_scheduler.py`) that simulate bursty sensor updates, forced disconnects, and payload serialization failures to keep the telemetry stack stable during refactors.
+- [done] Introduce a `telemetry_pipeline_t` facade that feeds both MQTT and future transports (WebSocket mirror, local buffering) from a single sensor snapshot source, eliminating direct `sensor_manager` calls from telemetry workers.
+- [done] Add structured logging helpers (`telemetry_log_publish_attempt()`, `telemetry_log_drop_reason()`) to replace ad-hoc `ESP_LOGI` calls and ensure every publish attempt includes payload digest, sensor snapshot ID, and connection state.
+- [done] Expand `/api/mqtt/status` (or add `/api/telemetry/status`) with queue depth, last-publish timestamp, and watchdog fault counts so dashboards can highlight stalled telemetry without reading logs.
+- [done] Build host-side regression tests (`test/host/test_mqtt_scheduler.py`) that simulate bursty sensor updates, forced disconnects, and payload serialization failures to keep the telemetry stack stable during refactors.
 
 **Deliverables**:
 - `services/telemetry/README.md` describing module boundaries (payload builder, scheduler, connection controller, watchdog, diagnostics) plus how they interact with `services_start()`.

@@ -22,6 +22,7 @@ static mqtt_watchdog_state_t s_watchdog_state = {0};
 static int64_t s_unhealthy_since_us = 0;
 static int64_t s_last_report_us = 0;
 static bool s_watchdog_tripped = false;
+static uint32_t s_trip_count = 0;
 
 static void mqtt_watchdog_reset(void)
 {
@@ -91,6 +92,7 @@ static void mqtt_watchdog_timer_cb(void *arg)
         services_report_degraded("mqtt", ESP_ERR_TIMEOUT);
         s_watchdog_tripped = true;
         s_last_report_us = now_us;
+        s_trip_count++;
     }
 }
 
@@ -114,6 +116,8 @@ esp_err_t mqtt_connection_watchdog_start(const mqtt_connection_watchdog_config_t
     }
 
     mqtt_watchdog_load_config(config);
+    s_trip_count = 0;
+    s_last_report_us = 0;
 
     const esp_timer_create_args_t args = {
         .callback = mqtt_watchdog_timer_cb,
@@ -155,4 +159,20 @@ void mqtt_connection_watchdog_stop(void)
     }
 
     mqtt_watchdog_reset();
+}
+
+void mqtt_connection_watchdog_get_metrics(mqtt_watchdog_metrics_t *metrics)
+{
+    if (metrics == NULL) {
+        return;
+    }
+
+    metrics->active = (s_watchdog_timer != NULL);
+    metrics->tripped = s_watchdog_tripped;
+    metrics->trip_count = s_trip_count;
+    metrics->unhealthy_since_us = s_unhealthy_since_us;
+    metrics->last_report_us = s_last_report_us;
+    metrics->poll_interval_ms = s_watchdog_state.poll_interval_ms;
+    metrics->stuck_threshold_ms = s_watchdog_state.stuck_threshold_ms;
+    metrics->report_interval_ms = s_watchdog_state.report_interval_ms;
 }

@@ -19,6 +19,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "web_file_editor.h"
 #include "services/telemetry/mqtt_telemetry.h"
 #include "services/telemetry/mqtt_connection_controller.h"
+#include "services/telemetry/mqtt_connection_watchdog.h"
 #include "http_websocket.h"
 #include "http_handlers_sensors.h"
 #include "esp_https_server.h"
@@ -354,6 +355,12 @@ static esp_err_t api_mqtt_status_handler(httpd_req_t *req)
         return ESP_ERR_NO_MEM;
     }
 
+    const int64_t now_us = esp_timer_get_time();
+    mqtt_telemetry_diagnostics_t telemetry_diag = {0};
+    mqtt_telemetry_get_diagnostics(&telemetry_diag);
+    mqtt_watchdog_metrics_t watchdog_metrics = {0};
+    mqtt_connection_watchdog_get_metrics(&watchdog_metrics);
+
     const char *state_str = mqtt_state_to_string(metrics.state);
     cJSON_AddStringToObject(root, "state", state_str);
     cJSON_AddNumberToObject(root, "state_code", metrics.state);
@@ -366,7 +373,7 @@ static esp_err_t api_mqtt_status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "last_transition_us", (double)metrics.last_transition_us);
 
     if (metrics.last_transition_us > 0) {
-        int64_t delta_us = esp_timer_get_time() - metrics.last_transition_us;
+        int64_t delta_us = now_us - metrics.last_transition_us;
         if (delta_us < 0) {
             delta_us = 0;
         }
@@ -374,6 +381,112 @@ static esp_err_t api_mqtt_status_handler(httpd_req_t *req)
         cJSON_AddNumberToObject(root, "seconds_since_transition", delta_sec);
     } else {
         cJSON_AddNumberToObject(root, "seconds_since_transition", -1);
+    }
+
+    const telemetry_pipeline_metrics_t *pipeline_metrics = &telemetry_diag.pipeline_metrics;
+    cJSON *telemetry = cJSON_CreateObject();
+    if (telemetry != NULL) {
+        cJSON_AddNumberToObject(telemetry, "publish_interval_sec", telemetry_diag.publish_interval_sec);
+        cJSON_AddNumberToObject(telemetry, "busy_backoff_ms", telemetry_diag.busy_backoff_ms);
+        cJSON_AddNumberToObject(telemetry, "client_backoff_ms", telemetry_diag.client_backoff_ms);
+        cJSON_AddNumberToObject(telemetry, "idle_delay_ms", telemetry_diag.idle_delay_ms);
+        cJSON_AddBoolToObject(telemetry, "interval_enabled", telemetry_diag.interval_enabled);
+        cJSON_AddBoolToObject(telemetry, "manual_request_pending", telemetry_diag.manual_request_pending);
+        cJSON_AddNumberToObject(telemetry, "publish_queue_depth", telemetry_diag.publish_queue_depth);
+        cJSON_AddNumberToObject(telemetry, "total_attempts", pipeline_metrics->total_attempts);
+        cJSON_AddNumberToObject(telemetry, "total_success", pipeline_metrics->total_success);
+        cJSON_AddNumberToObject(telemetry, "total_failure", pipeline_metrics->total_failure);
+        cJSON_AddNumberToObject(telemetry, "last_sequence_id", pipeline_metrics->last_sequence_id);
+        cJSON_AddNumberToObject(telemetry, "last_sensor_count", pipeline_metrics->last_sensor_count);
+        cJSON_AddNumberToObject(telemetry, "last_rssi", pipeline_metrics->last_rssi);
+        cJSON_AddBoolToObject(telemetry, "last_battery_valid", pipeline_metrics->last_battery_valid);
+        if (pipeline_metrics->last_battery_valid) {
+            cJSON_AddNumberToObject(telemetry,
+                                    "last_battery_percent",
+                                    pipeline_metrics->last_battery_percent);
+        }
+        cJSON_AddNumberToObject(telemetry,
+                                "last_capture_us",
+                                (double)pipeline_metrics->last_capture_us);
+        cJSON_AddNumberToObject(telemetry,
+                                "last_publish_us",
+                                (double)pipeline_metrics->last_publish_us);
+        if (pipeline_metrics->last_capture_us > 0) {
+            double seconds_since_capture = (double)(now_us - pipeline_metrics->last_capture_us) / 1000000.0;
+            cJSON_AddNumberToObject(telemetry, "seconds_since_capture", seconds_since_capture);
+        } else {
+            cJSON_AddNumberToObject(telemetry, "seconds_since_capture", -1);
+        }
+        if (pipeline_metrics->last_publish_us > 0) {
+            double seconds_since_publish = (double)(now_us - pipeline_metrics->last_publish_us) / 1000000.0;
+            cJSON_AddNumberToObject(telemetry, "seconds_since_publish", seconds_since_publish);
+        } else {
+            cJSON_AddNumberToObject(telemetry, "seconds_since_publish", -1);
+        }
+        double scheduler_last_publish_us =
+            (telemetry_diag.scheduler_last_publish_us > 0)
+                ? (double)telemetry_diag.scheduler_last_publish_us
+                : -1;
+        cJSON_AddNumberToObject(telemetry, "scheduler_last_publish_us", scheduler_last_publish_us);
+        if (telemetry_diag.scheduler_last_publish_us > 0) {
+            double scheduler_delta =
+                (double)(now_us - telemetry_diag.scheduler_last_publish_us) / 1000000.0;
+            cJSON_AddNumberToObject(telemetry,
+                                    "seconds_since_scheduler_publish",
+                                    scheduler_delta);
+        } else {
+            cJSON_AddNumberToObject(telemetry, "seconds_since_scheduler_publish", -1);
+        }
+
+        double scheduler_next_retry_us =
+            (telemetry_diag.scheduler_next_retry_us > 0)
+                ? (double)telemetry_diag.scheduler_next_retry_us
+                : -1;
+        cJSON_AddNumberToObject(telemetry, "scheduler_next_retry_us", scheduler_next_retry_us);
+        if (telemetry_diag.scheduler_next_retry_us > now_us) {
+            double until_retry = (double)(telemetry_diag.scheduler_next_retry_us - now_us) / 1000000.0;
+            cJSON_AddNumberToObject(telemetry, "seconds_until_next_retry", until_retry);
+        } else {
+            cJSON_AddNumberToObject(telemetry, "seconds_until_next_retry", -1);
+        }
+    }
+
+    if (telemetry != NULL) {
+        cJSON_AddItemToObject(root, "telemetry", telemetry);
+    }
+
+    cJSON *watchdog = cJSON_CreateObject();
+    if (watchdog != NULL) {
+        cJSON_AddBoolToObject(watchdog, "active", watchdog_metrics.active);
+        cJSON_AddBoolToObject(watchdog, "tripped", watchdog_metrics.tripped);
+        cJSON_AddNumberToObject(watchdog, "trip_count", watchdog_metrics.trip_count);
+        cJSON_AddNumberToObject(watchdog,
+                                "poll_interval_ms",
+                                watchdog_metrics.poll_interval_ms);
+        cJSON_AddNumberToObject(watchdog,
+                                "stuck_threshold_ms",
+                                watchdog_metrics.stuck_threshold_ms);
+        cJSON_AddNumberToObject(watchdog,
+                                "report_interval_ms",
+                                watchdog_metrics.report_interval_ms);
+        if (watchdog_metrics.unhealthy_since_us > 0) {
+            double unhealthy_ms =
+                (double)(now_us - watchdog_metrics.unhealthy_since_us) / 1000.0;
+            cJSON_AddNumberToObject(watchdog, "unhealthy_duration_ms", unhealthy_ms);
+        } else {
+            cJSON_AddNumberToObject(watchdog, "unhealthy_duration_ms", -1);
+        }
+        if (watchdog_metrics.last_report_us > 0) {
+            double seconds_since_report =
+                (double)(now_us - watchdog_metrics.last_report_us) / 1000000.0;
+            cJSON_AddNumberToObject(watchdog, "seconds_since_last_report", seconds_since_report);
+        } else {
+            cJSON_AddNumberToObject(watchdog, "seconds_since_last_report", -1);
+        }
+    }
+
+    if (watchdog != NULL) {
+        cJSON_AddItemToObject(root, "watchdog", watchdog);
     }
 
     char *json_str = cJSON_PrintUnformatted(root);
