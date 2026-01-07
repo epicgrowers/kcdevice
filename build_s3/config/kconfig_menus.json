@@ -6817,6 +6817,139 @@
                 "children": [
                     {
                         "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": "Sampling interval for writing sensor cache snapshots to disk. Each entry\nis written as a newline-delimited JSON document. Values below 5 seconds\nare clamped to 5 seconds at runtime.",
+                        "id": "KC_SD_LOG_INTERVAL_SEC",
+                        "name": "KC_SD_LOG_INTERVAL_SEC",
+                        "range": [
+                            5,
+                            3600
+                        ],
+                        "title": "SD log interval (seconds)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": "Select which SPI host is reserved for the SD card. ESP32-S3 boards\ntypically wire the SD slot to FSPI (host 2). ESP32-C6 boards should keep\nthe logger disabled unless an external slot is wired up.",
+                        "id": "KC_SD_SPI_HOST",
+                        "name": "KC_SD_SPI_HOST",
+                        "range": [
+                            1,
+                            3
+                        ],
+                        "title": "SDSPI host (2 = FSPI, 3 = HSPI)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": "Maximum SPI clock used when talking to the SD card. Lower frequencies\nimprove signal integrity on long traces; higher frequencies increase\nthroughput.",
+                        "id": "KC_SD_SPI_MAX_FREQ_KHZ",
+                        "name": "KC_SD_SPI_MAX_FREQ_KHZ",
+                        "range": [
+                            400,
+                            32000
+                        ],
+                        "title": "SDSPI clock frequency (kHz)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": null,
+                        "id": "KC_SD_SPI_MISO_GPIO",
+                        "name": "KC_SD_SPI_MISO_GPIO",
+                        "range": [
+                            0,
+                            48
+                        ],
+                        "title": "SD card MISO GPIO",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": null,
+                        "id": "KC_SD_SPI_MOSI_GPIO",
+                        "name": "KC_SD_SPI_MOSI_GPIO",
+                        "range": [
+                            0,
+                            48
+                        ],
+                        "title": "SD card MOSI GPIO",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": null,
+                        "id": "KC_SD_SPI_CLK_GPIO",
+                        "name": "KC_SD_SPI_CLK_GPIO",
+                        "range": [
+                            0,
+                            48
+                        ],
+                        "title": "SD card CLK GPIO",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": null,
+                        "id": "KC_SD_SPI_CS_GPIO",
+                        "name": "KC_SD_SPI_CS_GPIO",
+                        "range": [
+                            0,
+                            48
+                        ],
+                        "title": "SD card CS GPIO",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": "Optional GPIO input wired to the SD slot card-detect switch. Set to -1\nif the board does not expose a detect pin.",
+                        "id": "KC_SD_CARD_DETECT_GPIO",
+                        "name": "KC_SD_CARD_DETECT_GPIO",
+                        "range": [
+                            -1,
+                            48
+                        ],
+                        "title": "Card detect GPIO (-1 to disable)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "KC_SD_LOGGER_ENABLED",
+                        "help": "Set to Y when the card-detect line reads LOW while a card is inserted.\nLeave enabled for most slots; disable when the detect pin is active-high.",
+                        "id": "KC_SD_CARD_DETECT_ACTIVE_LOW",
+                        "name": "KC_SD_CARD_DETECT_ACTIVE_LOW",
+                        "range": null,
+                        "title": "Card detect is active-low",
+                        "type": "bool"
+                    }
+                ],
+                "depends_on": null,
+                "help": "Enable the background task that writes sensor snapshots to an SD card\nusing the SDSPI host driver. This feature is intended for the ESP32-S3\ndashboard build where a microSD slot is wired to the FSPI pins.",
+                "id": "KC_SD_LOGGER_ENABLED",
+                "name": "KC_SD_LOGGER_ENABLED",
+                "range": null,
+                "title": "Enable SD card sensor logging",
+                "type": "bool"
+            }
+        ],
+        "depends_on": null,
+        "id": "kc-device-options",
+        "title": "KC Device Options",
+        "type": "menu"
+    },
+    {
+        "children": [
+            {
+                "children": [
+                    {
+                        "children": [],
                         "depends_on": "<choice COMPILER_OPTIMIZATION>",
                         "help": null,
                         "id": "COMPILER_OPTIMIZATION_DEBUG",

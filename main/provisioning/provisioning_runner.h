@@ -27,6 +27,7 @@ typedef struct {
     bool used_stored_credentials;
     bool provisioning_triggered;
     bool sensors_ready_during_provisioning;
+    bool waiting_for_wifi_retry;
 } provisioning_outcome_t;
 
 esp_err_t provisioning_run(const provisioning_plan_t *plan, provisioning_outcome_t *outcome);

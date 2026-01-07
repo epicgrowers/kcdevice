@@ -3,10 +3,12 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include "esp_netif.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/timers.h"
 #include <string.h>
 
 static const char *TAG = "WIFI_MGR";
@@ -15,10 +17,12 @@ static const char *TAG = "WIFI_MGR";
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
-// Maximum retry attempts
-#define MAX_RETRY_ATTEMPTS 5
+#define WIFI_RETRY_BASE_DELAY_MS 1000U
+#define WIFI_RETRY_MAX_DELAY_MS 60000U
+#define WIFI_RETRY_MAX_EXPONENT 6U
 
 static EventGroupHandle_t s_wifi_event_group;
+static TimerHandle_t s_retry_timer = NULL;
 static int s_retry_num = 0;
 static bool s_is_connected = false;
 static bool s_has_credentials_configured = false;
@@ -29,6 +33,9 @@ static char pending_password[64] = {0};
 
 // Forward declarations
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+static void wifi_retry_timer_cb(TimerHandle_t timer);
+static uint32_t wifi_compute_retry_delay_ms(void);
+static void wifi_schedule_retry(uint32_t delay_ms);
 
 // WiFi event handler
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -45,40 +52,37 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "WiFi disconnected (reason: %d)", disconn_event->reason);
         
         s_is_connected = false;
+        s_retry_num++;
+        const uint32_t delay_ms = wifi_compute_retry_delay_ms();
+        wifi_schedule_retry(delay_ms);
         
-        if (s_retry_num < MAX_RETRY_ATTEMPTS) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retry connection attempt %d/%d", s_retry_num, MAX_RETRY_ATTEMPTS);
-            
-            char msg[64];
-            snprintf(msg, sizeof(msg), "Connecting... (attempt %d/%d)", s_retry_num, MAX_RETRY_ATTEMPTS);
-            provisioning_state_set(PROV_STATE_WIFI_CONNECTING, STATUS_SUCCESS, msg);
-            
-        } else {
-            ESP_LOGE(TAG, "Failed to connect after %d attempts", MAX_RETRY_ATTEMPTS);
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-            
-            // Determine failure reason
-            provisioning_status_code_t status_code = STATUS_ERROR_WIFI_TIMEOUT;
-            const char* error_msg = "Connection timeout";
-            
-            switch (disconn_event->reason) {
-                case WIFI_REASON_AUTH_FAIL:
-                case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-                case WIFI_REASON_HANDSHAKE_TIMEOUT:
-                    status_code = STATUS_ERROR_WIFI_AUTH_FAILED;
-                    error_msg = "Authentication failed - check password";
-                    break;
-                case WIFI_REASON_NO_AP_FOUND:
-                case WIFI_REASON_BEACON_TIMEOUT:
-                    status_code = STATUS_ERROR_WIFI_NO_AP_FOUND;
-                    error_msg = "Access point not found - check SSID";
-                    break;
-                default:
-                    break;
-            }
-            
+        char msg[96];
+        snprintf(msg, sizeof(msg), "Connecting... (attempt %d, next in %lus)",
+                 s_retry_num, (unsigned long)(delay_ms / 1000U));
+        provisioning_state_set(PROV_STATE_WIFI_CONNECTING, STATUS_SUCCESS, msg);
+        
+        provisioning_status_code_t status_code = STATUS_ERROR_WIFI_TIMEOUT;
+        const char* error_msg = "Connection timeout";
+
+        switch (disconn_event->reason) {
+            case WIFI_REASON_AUTH_FAIL:
+            case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+            case WIFI_REASON_HANDSHAKE_TIMEOUT:
+                status_code = STATUS_ERROR_WIFI_AUTH_FAILED;
+                error_msg = "Authentication failed - check password";
+                break;
+            case WIFI_REASON_NO_AP_FOUND:
+            case WIFI_REASON_BEACON_TIMEOUT:
+                status_code = STATUS_ERROR_WIFI_NO_AP_FOUND;
+                error_msg = "Access point not found - check SSID";
+                break;
+            default:
+                break;
+        }
+
+        if (s_retry_num == 1) {
+            xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        } else if (s_retry_num % 10 == 0) {
             provisioning_state_set(PROV_STATE_WIFI_FAILED, status_code, error_msg);
         }
         
@@ -87,6 +91,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "WiFi connected! IP: " IPSTR, IP2STR(&event->ip_info.ip));
         
         s_retry_num = 0;
+        if (s_retry_timer != NULL) {
+            xTimerStop(s_retry_timer, 0);
+        }
         s_is_connected = true;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         
@@ -118,6 +125,17 @@ esp_err_t wifi_manager_init(void)
         return ESP_FAIL;
     }
     
+    // Create retry timer before network activity
+    s_retry_timer = xTimerCreate("wifi_retry",
+                                 pdMS_TO_TICKS(WIFI_RETRY_BASE_DELAY_MS),
+                                 pdFALSE,
+                                 NULL,
+                                 wifi_retry_timer_cb);
+    if (s_retry_timer == NULL) {
+        ESP_LOGE(TAG, "Failed to create WiFi retry timer");
+        return ESP_FAIL;
+    }
+
     // Initialize TCP/IP stack
     ESP_ERROR_CHECK(esp_netif_init());
     
@@ -144,7 +162,7 @@ esp_err_t wifi_manager_init(void)
     
     // Start WiFi
     ESP_ERROR_CHECK(esp_wifi_start());
-    
+
     ESP_LOGI(TAG, "WiFi manager initialized successfully");
     return ESP_OK;
 }
@@ -184,6 +202,9 @@ esp_err_t wifi_manager_connect(const char* ssid, const char* password)
     
     // Reset retry counter
     s_retry_num = 0;
+    if (s_retry_timer != NULL) {
+        xTimerStop(s_retry_timer, 0);
+    }
     
     // Update state
     provisioning_state_set(PROV_STATE_WIFI_CONNECTING, STATUS_SUCCESS, "Initiating WiFi connection");
@@ -225,40 +246,111 @@ esp_err_t wifi_manager_disconnect(void)
 {
     ESP_LOGI(TAG, "Disconnecting from WiFi");
     s_is_connected = false;
+    if (s_retry_timer != NULL) {
+        xTimerStop(s_retry_timer, 0);
+    }
     return esp_wifi_disconnect();
 }
 
 esp_err_t wifi_manager_clear_credentials(void)
 {
     ESP_LOGI(TAG, "Clearing stored credentials");
-    
-    // Stop WiFi first
-    esp_wifi_stop();
-    
-    // Clear ESP-IDF's WiFi credentials by erasing the NVS WiFi namespace
-    // This is the proper way to clear credentials stored by WIFI_STORAGE_FLASH
-    nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open("nvs.net80211", NVS_READWRITE, &nvs_handle);
-    if (ret == ESP_OK) {
-        ret = nvs_erase_all(nvs_handle);
-        if (ret == ESP_OK) {
-            ret = nvs_commit(nvs_handle);
-            ESP_LOGI(TAG, "Erased WiFi credentials from NVS namespace 'nvs.net80211'");
-        } else {
-            ESP_LOGW(TAG, "Failed to erase NVS WiFi namespace: %s", esp_err_to_name(ret));
-        }
-        nvs_close(nvs_handle);
-    } else {
-        ESP_LOGW(TAG, "Failed to open NVS WiFi namespace (may not exist): %s", esp_err_to_name(ret));
-        // Not an error - credentials might not exist yet
-        ret = ESP_OK;
+
+    // Stop WiFi first (ignore if already stopped/not initialized)
+    esp_err_t stop_ret = esp_wifi_stop();
+    if (stop_ret != ESP_OK &&
+        stop_ret != ESP_ERR_WIFI_NOT_INIT &&
+        stop_ret != ESP_ERR_WIFI_NOT_STARTED) {
+        ESP_LOGW(TAG, "esp_wifi_stop failed: %s", esp_err_to_name(stop_ret));
     }
-    
-    // Clear the configured flag
+
+    // Use esp_wifi_restore so the driver clears its own flash-stored config
+    esp_err_t ret = esp_wifi_restore();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "esp_wifi_restore failed (%s), falling back to manual NVS erase",
+                 esp_err_to_name(ret));
+
+        nvs_handle_t nvs_handle;
+        esp_err_t nvs_ret = nvs_open("net80211", NVS_READWRITE, &nvs_handle);
+        if (nvs_ret == ESP_OK) {
+            nvs_ret = nvs_erase_all(nvs_handle);
+            if (nvs_ret == ESP_OK) {
+                nvs_ret = nvs_commit(nvs_handle);
+                ESP_LOGI(TAG, "Erased WiFi credentials from NVS namespace 'net80211'");
+            } else {
+                ESP_LOGW(TAG, "Failed to erase NVS WiFi namespace: %s", esp_err_to_name(nvs_ret));
+            }
+            nvs_close(nvs_handle);
+            ret = nvs_ret;
+        } else {
+            ESP_LOGW(TAG, "Failed to open NVS WiFi namespace (may not exist): %s",
+                     esp_err_to_name(nvs_ret));
+            ret = (nvs_ret == ESP_ERR_NVS_NOT_FOUND) ? ESP_OK : nvs_ret;
+        }
+    } else {
+        ESP_LOGI(TAG, "esp_wifi_restore succeeded; WiFi config reset to defaults");
+    }
+
+    // Reset local state regardless of restore outcome
     s_has_credentials_configured = false;
-    
-    ESP_LOGI(TAG, "Credentials cleared successfully");
+    s_is_connected = false;
+    memset(pending_ssid, 0, sizeof(pending_ssid));
+    memset(pending_password, 0, sizeof(pending_password));
+
+    if (s_retry_timer != NULL) {
+        xTimerStop(s_retry_timer, 0);
+    }
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Credentials cleared successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to clear credentials: %s", esp_err_to_name(ret));
+    }
+
     return ret;
+}
+
+static void wifi_retry_timer_cb(TimerHandle_t timer)
+{
+    (void)timer;
+    if (!s_has_credentials_configured) {
+        ESP_LOGW(TAG, "Retry timer fired but no credentials configured");
+        return;
+    }
+
+    ESP_LOGI(TAG, "WiFi retry timer firing (attempt %d)", s_retry_num);
+    esp_err_t ret = esp_wifi_connect();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(ret));
+    }
+}
+
+static uint32_t wifi_compute_retry_delay_ms(void)
+{
+    uint32_t exponent = (s_retry_num < WIFI_RETRY_MAX_EXPONENT) ? (uint32_t)s_retry_num : WIFI_RETRY_MAX_EXPONENT;
+    uint32_t delay = WIFI_RETRY_BASE_DELAY_MS;
+    delay <<= exponent;
+    if (delay > WIFI_RETRY_MAX_DELAY_MS) {
+        delay = WIFI_RETRY_MAX_DELAY_MS;
+    }
+    return delay;
+}
+
+static void wifi_schedule_retry(uint32_t delay_ms)
+{
+    if (s_retry_timer == NULL) {
+        ESP_LOGW(TAG, "Retry timer not initialized; connecting immediately");
+        esp_wifi_connect();
+        return;
+    }
+
+    if (delay_ms == 0) {
+        delay_ms = WIFI_RETRY_BASE_DELAY_MS;
+    }
+
+    xTimerStop(s_retry_timer, 0);
+    xTimerChangePeriod(s_retry_timer, pdMS_TO_TICKS(delay_ms), 0);
+    xTimerStart(s_retry_timer, 0);
 }
 
 esp_err_t wifi_manager_save_credentials(const char* ssid, const char* password)

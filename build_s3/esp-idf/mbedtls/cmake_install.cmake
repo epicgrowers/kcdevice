@@ -39,6 +39,6 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Code/kc_device/build_s3/esp-idf/mbedtls/mbedtls/cmake_install.cmake")
+  include("C:/Code/kc/build_s3/esp-idf/mbedtls/mbedtls/cmake_install.cmake")
 endif()
 

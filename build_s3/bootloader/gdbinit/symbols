@@ -17,4 +17,4 @@ set confirm off
 set confirm on
 
 # Load application symbols
-file C:/Code/kc_device/build_s3/bootloader/bootloader.elf
+file C:/Code/kc/build_s3/bootloader/bootloader.elf

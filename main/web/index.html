@@ -89,6 +89,7 @@
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(2)'>⚙️ Settings</button>
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(3)'>🔧 Actions</button>
 <button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(4)'>💻 Manual Mode</button>
+<button class='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab' onclick='showTab(5)'>📝 Logs</button>
 </div>
 
 <div class='tab-content active' id='tab-0'>
@@ -271,6 +272,28 @@ class='px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold
 <p class='text-sm'>• Previous commands and responses are saved in this session</p>
 <p class='text-sm'>• Use the Clear button to reset the terminal display</p>
 <p class='text-sm'>• Closing or refreshing this page will clear the session history</p>
+</div>
+</div>
+
+<div class='tab-content' id='tab-5' style='display:none'>
+<h2 class='text-xl font-bold text-gray-900 dark:text-white mb-4'>📝 Device Logs</h2>
+<p class='text-sm text-gray-500 dark:text-gray-400 mb-4'>Inspect recent system messages and mirrored SD sensor entries directly from the device.</p>
+<div class='flex flex-wrap items-center justify-between gap-3 mb-4'>
+  <div class='flex flex-wrap gap-2'>
+    <button class='log-filter-button log-filter-active' data-log-filter='ALL' onclick='setLogFilter("ALL")'>All</button>
+    <button class='log-filter-button' data-log-filter='SENSOR' onclick='setLogFilter("SENSOR")'>Sensor Data</button>
+    <button class='log-filter-button' data-log-filter='WARNING' onclick='setLogFilter("WARNING")'>Warnings</button>
+    <button class='log-filter-button' data-log-filter='ERROR' onclick='setLogFilter("ERROR")'>Errors</button>
+  </div>
+  <div class='flex items-center gap-3'>
+    <button onclick='loadLogs(true)' class='bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 px-4 py-2 rounded-md text-sm font-medium'>
+      <i class='fas fa-rotate'></i> Refresh
+    </button>
+    <span id='logStatus' class='text-xs text-gray-500 dark:text-gray-400'>Never updated</span>
+  </div>
+</div>
+<div id='logList' class='space-y-3'>
+  <div class='text-gray-500 dark:text-gray-400 text-sm'>Logs will appear once the device begins reporting.</div>
 </div>
 </div>
 

@@ -15,6 +15,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "services/core/services_provisioning_bridge.h"
 #include "provisioning/provisioning_runner.h"
 #include "services/time_sync/time_sync.h"
+#include "services/logging/log_history.h"
 #include "services/keys/api_key_manager.h"
 #include "web_file_editor.h"
 #include "services/telemetry/mqtt_telemetry.h"
@@ -42,8 +43,27 @@ static const char *TAG = "HTTP_SERVER";
 
 static httpd_handle_t s_server = NULL;
 static http_server_config_t s_http_config = {0};
+static char *s_https_certificate = NULL;
+static size_t s_https_certificate_len = 0;
+static char *s_https_private_key = NULL;
+static size_t s_https_private_key_len = 0;
+
+static void http_server_free_tls_assets(void)
+{
+    if (s_https_certificate != NULL) {
+        free(s_https_certificate);
+        s_https_certificate = NULL;
+        s_https_certificate_len = 0;
+    }
+    if (s_https_private_key != NULL) {
+        free(s_https_private_key);
+        s_https_private_key = NULL;
+        s_https_private_key_len = 0;
+    }
+}
 
 #define OTA_UPLOAD_BUFFER_SIZE 4096
+#define LOG_API_MAX_ENTRIES    200
 
 // External sensor reading functions from mqtt_telemetry.c
 extern float read_temperature(void);
@@ -65,6 +85,8 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache);
 static const char *mqtt_state_to_string(mqtt_state_t state);
+static const char *log_category_to_string(log_history_category_t category);
+static esp_err_t api_logs_handler(httpd_req_t *req);
 
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache)
 {
@@ -127,6 +149,20 @@ static const char *mqtt_state_to_string(mqtt_state_t state)
             return "error";
         default:
             return "unknown";
+    }
+}
+
+static const char *log_category_to_string(log_history_category_t category)
+{
+    switch (category) {
+        case LOG_HISTORY_CATEGORY_ERROR:
+            return "ERROR";
+        case LOG_HISTORY_CATEGORY_WARNING:
+            return "WARNING";
+        case LOG_HISTORY_CATEGORY_SENSOR:
+            return "SENSOR";
+        default:
+            return "INFO";
     }
 }
 
@@ -341,6 +377,73 @@ static esp_err_t api_status_handler(httpd_req_t *req)
     
     free((void *)json_str);
     cJSON_Delete(root);
+    return ESP_OK;
+}
+
+static esp_err_t api_logs_handler(httpd_req_t *req)
+{
+    const size_t buffer_size = LOG_API_MAX_ENTRIES * sizeof(log_history_entry_t);
+    log_history_entry_t *entries = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (entries == NULL) {
+        entries = malloc(buffer_size);
+    }
+    if (entries == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+    memset(entries, 0, buffer_size);
+
+    size_t count = log_history_get_entries(LOG_HISTORY_FILTER_ALL, LOG_API_MAX_ENTRIES, entries);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *items = cJSON_CreateArray();
+    if (root == NULL || items == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        if (items != NULL) {
+            cJSON_Delete(items);
+        }
+        free(entries);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    const int64_t now_us = esp_timer_get_time();
+    for (size_t i = 0; i < count; ++i) {
+        const log_history_entry_t *entry = &entries[i];
+        cJSON *item = cJSON_CreateObject();
+        if (item == NULL) {
+            continue;
+        }
+        cJSON_AddNumberToObject(item, "sequence", entry->sequence);
+        cJSON_AddStringToObject(item, "level", log_category_to_string(entry->category));
+        cJSON_AddStringToObject(item, "tag", entry->tag);
+        cJSON_AddStringToObject(item, "message", entry->message);
+        cJSON_AddNumberToObject(item, "timestamp_us", (double)entry->timestamp_us);
+        double age_sec = (double)(now_us - entry->timestamp_us) / 1000000.0;
+        if (age_sec < 0) {
+            age_sec = 0;
+        }
+        cJSON_AddNumberToObject(item, "age_sec", age_sec);
+        cJSON_AddItemToArray(items, item);
+    }
+
+    cJSON_AddItemToObject(root, "entries", items);
+    cJSON_AddNumberToObject(root, "count", count);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (json == NULL) {
+        free(entries);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    free(entries);
     return ESP_OK;
 }
 
@@ -696,6 +799,13 @@ static const httpd_uri_t api_status_uri = {
     .uri = "/api/status",
     .method = HTTP_GET,
     .handler = api_status_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t api_logs_uri = {
+    .uri = "/api/logs",
+    .method = HTTP_GET,
+    .handler = api_logs_handler,
     .user_ctx = NULL
 };
 
@@ -1064,6 +1174,9 @@ esp_err_t http_server_start(const http_server_config_t *config)
     }
 
     s_http_config = *config;
+
+    // Ensure any TLS material from a previous attempt is cleared
+    http_server_free_tls_assets();
     
     // Initialize FATFS-backed dashboard storage
     web_editor_init_fs();
@@ -1071,41 +1184,41 @@ esp_err_t http_server_start(const http_server_config_t *config)
     ESP_LOGI(TAG, "Starting HTTPS server...");
     
     // Get certificates from cloud provisioning
-    char *certificate = malloc(SERVICES_TLS_CERT_MAX_BYTES);
-    char *private_key = malloc(SERVICES_TLS_KEY_MAX_BYTES);
+    s_https_certificate = malloc(SERVICES_TLS_CERT_MAX_BYTES);
+    s_https_private_key = malloc(SERVICES_TLS_KEY_MAX_BYTES);
     
-    if (certificate == NULL || private_key == NULL) {
+    if (s_https_certificate == NULL || s_https_private_key == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for certificates");
-        free(certificate);
-        free(private_key);
+        http_server_free_tls_assets();
         return ESP_ERR_NO_MEM;
     }
     
     size_t cert_len = 0;
     size_t key_len = 0;
-    esp_err_t err = services_provisioning_load_https_certificate(certificate, &cert_len);
+    esp_err_t err = services_provisioning_load_https_certificate(s_https_certificate, &cert_len);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get certificate: %s", esp_err_to_name(err));
-        free(certificate);
-        free(private_key);
+        http_server_free_tls_assets();
         return err;
     }
     
-    err = services_provisioning_load_https_private_key(private_key, &key_len);
+    err = services_provisioning_load_https_private_key(s_https_private_key, &key_len);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get private key: %s", esp_err_to_name(err));
-        free(certificate);
-        free(private_key);
+        http_server_free_tls_assets();
         return err;
     }
     
+    s_https_certificate_len = cert_len;
+    s_https_private_key_len = key_len;
+
     ESP_LOGI(TAG, "Certificate length: %zu bytes", cert_len);
     ESP_LOGI(TAG, "Private key length: %zu bytes", key_len);
     
     // Debug certificate format
-    ESP_LOGI(TAG, "Cert first 100 chars: %.100s", certificate);
+    ESP_LOGI(TAG, "Cert first 100 chars: %.100s", s_https_certificate);
     if (cert_len > 100) {
-        ESP_LOGI(TAG, "Cert last 100 chars: %s", certificate + cert_len - 100);
+        ESP_LOGI(TAG, "Cert last 100 chars: %s", s_https_certificate + cert_len - 100);
     }
     
     // Configure HTTPS server
@@ -1123,10 +1236,10 @@ esp_err_t http_server_start(const http_server_config_t *config)
     
     // Set certificates (PEM format from NVS is already null-terminated)
     // mbedTLS needs length + 1 to include the null terminator
-    ssl_cfg.servercert = (const uint8_t *)certificate;
-    ssl_cfg.servercert_len = cert_len + 1;
-    ssl_cfg.prvtkey_pem = (const uint8_t *)private_key;
-    ssl_cfg.prvtkey_len = key_len + 1;
+    ssl_cfg.servercert = (const uint8_t *)s_https_certificate;
+    ssl_cfg.servercert_len = s_https_certificate_len + 1;
+    ssl_cfg.prvtkey_pem = (const uint8_t *)s_https_private_key;
+    ssl_cfg.prvtkey_len = s_https_private_key_len + 1;
     
     // Skip client certificate verification (allows browsers to connect without trusting cert)
     ssl_cfg.session_tickets = false;  // Disable session resumption for testing
@@ -1135,12 +1248,9 @@ esp_err_t http_server_start(const http_server_config_t *config)
     // Start server
     err = httpd_ssl_start(&s_server, &ssl_cfg);
     
-    // Clean up certificate buffers
-    free(certificate);
-    free(private_key);
-    
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start HTTPS server: %s", esp_err_to_name(err));
+        http_server_free_tls_assets();
         return err;
     }
     
@@ -1149,6 +1259,7 @@ esp_err_t http_server_start(const http_server_config_t *config)
     httpd_register_uri_handler(s_server, &root_uri);
     httpd_register_uri_handler(s_server, &ca_cert_uri);  // CA certificate download
     httpd_register_uri_handler(s_server, &api_status_uri);
+    httpd_register_uri_handler(s_server, &api_logs_uri);
     httpd_register_uri_handler(s_server, &api_mqtt_status_uri);
     httpd_register_uri_handler(s_server, &api_clear_wifi_uri);
     httpd_register_uri_handler(s_server, &api_reboot_uri);
@@ -1197,6 +1308,7 @@ esp_err_t http_server_stop(void)
     ESP_LOGI(TAG, "Stopping HTTPS server");
     httpd_ssl_stop(s_server);
     s_server = NULL;
+    http_server_free_tls_assets();
     
     return ESP_OK;
 }

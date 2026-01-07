@@ -39,16 +39,16 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Code/kc_device/build_s3/esp-idf/esp_hw_support/port/esp32s3/cmake_install.cmake")
+  include("C:/Code/kc/build_s3/esp-idf/esp_hw_support/port/esp32s3/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Code/kc_device/build_s3/esp-idf/esp_hw_support/mspi_timing_tuning/port/esp32s3/cmake_install.cmake")
+  include("C:/Code/kc/build_s3/esp-idf/esp_hw_support/mspi_timing_tuning/port/esp32s3/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Code/kc_device/build_s3/esp-idf/esp_hw_support/lowpower/cmake_install.cmake")
+  include("C:/Code/kc/build_s3/esp-idf/esp_hw_support/lowpower/cmake_install.cmake")
 endif()
 

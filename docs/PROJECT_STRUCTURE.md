@@ -34,6 +34,7 @@ kc_device/
 │   │   └── drivers/
 │   │       ├── ezo_sensor.c/.h      # Atlas Scientific EZO driver helpers
 │   │       └── max17048.c/.h        # MAX17048 battery monitor driver
+│   ├── storage/              # Local retention helpers (SD logging, future persistence tasks)
 │   ├── services/             # Network + cloud services subsystem
 │   │   ├── core/             # services_start()/services_stop() + shared config structs
 │   │   ├── http/             # Dashboard HTTP(S) server, REST handlers, WebSocket streaming
@@ -308,6 +309,22 @@ kc_device/
 **Key Functions**:
 - `max17048_init()` / `_read_voltage()` / `_read_percentage()` - Hardware accessors.
 - `max17048_get_chip_version()` - Useful for logs and troubleshooting.
+
+---
+
+#### `storage/`
+**Purpose**: Local retention helpers that mirror live telemetry onto removable media so the device keeps a history even when MQTT or Wi-Fi are unavailable.
+
+**Current Modules**:
+- [main/storage/sd_logger.c](main/storage/sd_logger.c) – Background FreeRTOS task that mounts the microSD slot over SDSPI and writes newline-delimited JSON snapshots (`/sdcard/logs/YYYYMMDD.ndjson`) populated from the global sensor cache.
+
+**Configuration Hooks**:
+- `KC_SD_*` options in [Kconfig.projbuild](Kconfig.projbuild) cover enablement, SPI host, pinout, clock rate, logging interval, and the card-detect GPIO.
+- [config/sdkconfig.defaults](config/sdkconfig.defaults) enables SD logging on the ESP32-S3 dashboard build; [config/sdkconfig.esp32c6](config/sdkconfig.esp32c6) keeps it disabled until hardware support exists.
+
+**Runtime Behavior**:
+- The task mounts the card on demand, retries every 10 seconds when absent, and pauses gracefully if the filesystem reports errors.
+- Each entry includes UTC timestamps, RSSI, battery state, interval metadata, and the same per-sensor payload structure the MQTT stack produces, ensuring parity between local and cloud logs.
 
 ---
 

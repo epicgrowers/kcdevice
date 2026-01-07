@@ -64,12 +64,15 @@ idf_component_register(SRCS "main.c"
                              "services/core/services_config.c"
                              "services/core/services_provisioning_bridge.c"
                              "network/network_boot.c"
+                             "network/connectivity_watchdog.c"
                              "sensors/sensor_boot.c"
-                             "services/http/web_file_editor.c"
+                                                         "services/http/web_file_editor.c"
+                                                         "services/logging/log_history.c"
                              "services/time_sync/time_sync.c"
-                               INCLUDE_DIRS "." "services/http" "${RUNTIME_CONFIG_HASH_DIR}"
-                               EMBED_TXTFILES ${WEB_FILES} "${CMAKE_SOURCE_DIR}/config/runtime/services.json" "${CMAKE_SOURCE_DIR}/config/runtime/api_keys.json"
-                               REQUIRES nvs_flash bt esp_wifi wifi_provisioning json esp_partition bootloader_support efuse driver esp_http_client app_update mqtt spi_flash esp_psram ${WEB_COMPONENTS})
+                                                         "storage/sd_logger.c"
+                                                             INCLUDE_DIRS "." "services/http" "services/logging" "${RUNTIME_CONFIG_HASH_DIR}"
+                                                             EMBED_TXTFILES ${WEB_FILES} "${CMAKE_SOURCE_DIR}/config/runtime/services.json" "${CMAKE_SOURCE_DIR}/config/runtime/api_keys.json"
+                                                             REQUIRES nvs_flash bt esp_wifi wifi_provisioning json esp_partition bootloader_support efuse driver esp_http_client app_update mqtt spi_flash esp_psram fatfs sdmmc ${WEB_COMPONENTS})
 if(TARGET runtime_config_hash)
         add_dependencies(${COMPONENT_LIB} runtime_config_hash)
 endif()

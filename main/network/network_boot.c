@@ -6,12 +6,15 @@
 #include "services/provisioning/cloud_provisioning.h"
 #include "services/core/services.h"
 #include "services/core/services_config.h"
+#include "network/connectivity_watchdog.h"
 #include "config/runtime_config.h"
 #include "sensors/pipeline.h"
 #include "provisioning/provisioning_runner.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_event.h"
+#include "esp_netif.h"
 #include <time.h>
 #include <string.h>
 
@@ -19,6 +22,7 @@ static const char *TAG = "NETWORK_BOOT";
 
 static network_boot_config_t s_network_boot_config;
 static bool s_network_task_started = false;
+static bool s_services_started = false;
 
 typedef struct {
     bool core_ready;
@@ -189,6 +193,24 @@ static void services_status_listener(const services_status_event_t *event, void 
     }
 }
 
+static void network_ip_event_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_data;
+    if (base != IP_EVENT || event_id != IP_EVENT_STA_GOT_IP) {
+        return;
+    }
+
+    if (!s_services_started) {
+        return;
+    }
+
+    esp_err_t ret = services_handle_network_recovered();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "NETWORK: recovery handler returned %s", esp_err_to_name(ret));
+    }
+}
+
 static void network_task(void *arg)
 {
     (void)arg;
@@ -293,6 +315,22 @@ static void network_task(void *arg)
     ret = services_start(&services_cfg, &services_deps, services_status_listener, &s_services_observer);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "NETWORK: \u2713 Services core launch requested");
+        s_services_started = true;
+
+        esp_err_t ip_handler = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &network_ip_event_handler, NULL);
+        if (ip_handler != ESP_OK) {
+            ESP_LOGW(TAG, "NETWORK: Failed to register IP event handler (%s)", esp_err_to_name(ip_handler));
+        }
+
+        connectivity_watchdog_config_t watchdog_cfg = {
+            .check_interval_ms = 10000U,
+            .failure_threshold = 3U,
+            .probe_hostname = "time.google.com",
+        };
+        esp_err_t watch_ret = connectivity_watchdog_start(&watchdog_cfg);
+        if (watch_ret != ESP_OK) {
+            ESP_LOGW(TAG, "NETWORK: Connectivity watchdog start failed: %s", esp_err_to_name(watch_ret));
+        }
     } else {
         ESP_LOGE(TAG, "NETWORK: Services core failed to start: %s", esp_err_to_name(ret));
     }

@@ -100,7 +100,10 @@ def main():
             response = requests.put(
                 upload_url,
                 data=content.encode('utf-8'),
-                headers={'Content-Type': 'text/plain; charset=utf-8'},
+                headers={
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Connection': 'close'
+                },
                 verify=False,
                 timeout=10
             )

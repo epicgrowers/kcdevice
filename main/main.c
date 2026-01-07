@@ -17,6 +17,8 @@
 #include "provisioning/provisioning_runner.h"
 #include "network/network_boot.h"
 #include "sensors/pipeline.h"
+#include "storage/sd_logger.h"
+#include "services/logging/log_history.h"
 
 static const char *TAG = "MAIN";
 
@@ -28,6 +30,11 @@ static boot_coordinator_t s_boot_coordinator = {0};
  */
 void app_main(void)
 {
+    esp_err_t log_history_ret = log_history_init();
+    if (log_history_ret != ESP_OK) {
+        ESP_LOGW(TAG, "MAIN: Log history disabled (%s)", esp_err_to_name(log_history_ret));
+    }
+
     ESP_LOGI(TAG, "KannaCloud Device - Parallel Boot v2.0");
     
     // Enable verbose logging for provisioning components
@@ -100,9 +107,18 @@ void app_main(void)
 
     provisioning_outcome_t provisioning_outcome;
     ret = provisioning_run(&provisioning_plan, &provisioning_outcome);
-    if (ret != ESP_OK || !provisioning_outcome.connected) {
+    if (ret != ESP_OK) {
         ESP_LOGE(TAG, "MAIN: Provisioning run failed: %s", esp_err_to_name(ret));
         return;
+    }
+
+    if (!provisioning_outcome.connected) {
+        if (provisioning_outcome.waiting_for_wifi_retry) {
+            ESP_LOGW(TAG, "MAIN: Stored credentials present but WiFi not reachable; continuing boot while WiFi manager keeps retrying");
+        } else {
+            ESP_LOGE(TAG, "MAIN: Provisioning did not complete and no WiFi retry in progress");
+            return;
+        }
     }
 
     if (provisioning_outcome.used_stored_credentials) {
@@ -136,6 +152,13 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "MAIN: ✓ Network task launch requested");
     }
+
+#if CONFIG_KC_SD_LOGGER_ENABLED
+    esp_err_t sd_logger_ret = sd_logger_init();
+    if (sd_logger_ret != ESP_OK) {
+        ESP_LOGW(TAG, "MAIN: SD logger unavailable (%s)", esp_err_to_name(sd_logger_ret));
+    }
+#endif
     
     // Phase 4: Wait for boot tasks to complete
     ESP_LOGI(TAG, "MAIN: Waiting for sensor task to complete...");

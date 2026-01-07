@@ -204,7 +204,7 @@ esp_err_t reset_button_init(int gpio_num, reset_button_callback_t callback)
     task_ret = xTaskCreate(
         reset_button_monitor_task,
         "reset_btn_monitor",
-        2048,
+        4096,
         NULL,
         5,
         NULL

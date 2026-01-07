@@ -1887,6 +1887,20 @@ I (185000) NETWORK: WiFi reconnected
 I (186000) NETWORK: MQTT reconnected to broker
 ```
 
+### SD Card Logging Task
+
+The new [main/storage/sd_logger.c](main/storage/sd_logger.c) component starts once
+network services launch and runs independently of MQTT. It watches the shared
+sensor cache and writes newline-delimited JSON snapshots to
+`/sdcard/logs/YYYYMMDD.ndjson` at the configurable interval exposed via the
+`KC_SD_*` Kconfig entries (see [config/sdkconfig.defaults](config/sdkconfig.defaults)
+for the ESP32-S3 defaults). Key behaviors:
+
+- Uses the SDSPI host so it only consumes four GPIOs plus an optional card-detect pin.
+- Mount attempts are retried every 10 seconds and automatically resume when a card is inserted.
+- Each log entry captures UTC timestamp, RSSI, battery state, interval metadata, and the same sensor JSON schema used by MQTT.
+- Card removal or filesystem errors pause logging gracefully while keeping the task alive for future inserts.
+
 ---
 
 ## Future Enhancements
@@ -1900,7 +1914,6 @@ I (186000) NETWORK: MQTT reconnected to broker
 ### Advanced Sensor Management
 - User-configurable sensor addresses via dashboard
 - Sensor calibration via local UI
-- Historical data logging to SD card
 - Sensor health graphs on display
 
 ### Enhanced Recovery

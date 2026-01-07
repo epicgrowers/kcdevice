@@ -34,6 +34,12 @@ core so the boot coordinator stays authoritative.
 	event bits. `services_stop()` unwinds the stack in reverse order and clears the degraded bit so
 	a future restart can report a clean slate.
 
+`services_config_t` now includes `require_time_sync_for_tls` (default: true). When enabled, TLS-
+dependent services (HTTPS dashboard, MQTT telemetry, mDNS HTTPS advertisement) refuse to start
+until SNTP reports a synchronized clock, emitting `SERVICES_EVENT_DEGRADED` instead of attempting
+handshakes with an invalid system time. Override the flag through `config/runtime/services.json`
+if a deployment must operate without time sync.
+
 ## Event Bits & Degradation
 - `NETWORK_READY_BIT` is asserted after at least one service is running (or every optional service
   was intentionally disabled). This mirrors the previous behavior so `app_main()` can unblock as

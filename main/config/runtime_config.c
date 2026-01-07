@@ -24,6 +24,8 @@ typedef struct {
     bool enable_mdns;
     bool enable_time_sync_present;
     bool enable_time_sync;
+    bool require_time_sync_for_tls_present;
+    bool require_time_sync_for_tls;
     bool https_port_present;
     uint16_t https_port;
     bool mqtt_interval_present;
@@ -179,6 +181,9 @@ static esp_err_t runtime_parse_overrides(void)
         s_overrides.enable_mqtt_present = runtime_get_bool(services, "enable_mqtt", &s_overrides.enable_mqtt);
         s_overrides.enable_mdns_present = runtime_get_bool(services, "enable_mdns", &s_overrides.enable_mdns);
         s_overrides.enable_time_sync_present = runtime_get_bool(services, "enable_time_sync", &s_overrides.enable_time_sync);
+        s_overrides.require_time_sync_for_tls_present = runtime_get_bool(services,
+                                                                         "require_time_sync_for_tls",
+                                                                         &s_overrides.require_time_sync_for_tls);
         s_overrides.https_port_present = runtime_get_uint16(services, "https_port", &s_overrides.https_port);
     }
 
@@ -253,6 +258,10 @@ esp_err_t runtime_config_apply_services_overrides(services_config_t *config)
 
     if (s_overrides.enable_time_sync_present) {
         config->enable_time_sync = s_overrides.enable_time_sync;
+    }
+
+    if (s_overrides.require_time_sync_for_tls_present) {
+        config->require_time_sync_for_tls = s_overrides.require_time_sync_for_tls;
     }
 
     if (s_overrides.https_port_present) {

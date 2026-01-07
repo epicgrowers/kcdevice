@@ -13,8 +13,8 @@ end
 
 # Load bootloader symbols
 set confirm off
-    add-symbol-file C:/Code/kc_device/build_s3/bootloader/bootloader.elf
+    add-symbol-file C:/Code/kc/build_s3/bootloader/bootloader.elf
 set confirm on
 
 # Load application symbols
-file C:/Code/kc_device/build_s3/kc_device.elf
+file C:/Code/kc/build_s3/kc_device.elf

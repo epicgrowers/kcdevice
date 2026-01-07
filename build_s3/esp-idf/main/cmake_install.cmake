@@ -1,4 +1,4 @@
-# Install script for directory: C:/Code/kc_device/main
+# Install script for directory: C:/Code/kc/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

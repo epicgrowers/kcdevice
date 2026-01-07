@@ -28,6 +28,9 @@ Secure Wi-Fi provisioning firmware for ESP32-S3 and ESP32-C6 chips based on the 
   - Long press: full NVS erase / factory reset
 - **Cloud + Peripheral Stack**
   - Time sync, HTTPS dashboard, MQTT telemetry, sensor polling, and API key manager remain unchanged and simply wait for `wifi_manager` to report a connection
+- **SD Card Logger** (`main/storage/sd_logger.c`)
+  - Optional SDSPI task (ESP32-S3 default) that records newline-delimited JSON snapshots to `/sdcard/logs/` at a configurable interval
+  - Pinout, SPI frequency, and logging cadence are controllable via the new `KC_SD_*` Kconfig options / `config/sdkconfig.defaults`
 
 ## Project Layout
 

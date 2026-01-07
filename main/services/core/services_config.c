@@ -11,6 +11,7 @@ static const services_config_t s_services_defaults = {
     .enable_mqtt = false,
     .enable_mdns = false,
     .enable_time_sync = true,
+    .require_time_sync_for_tls = true,
     .tls_ready = false,
     .time_synced = false,
     .https_port = 443,

@@ -4,6 +4,7 @@
     "enable_mqtt": true,
     "enable_mdns": true,
     "enable_time_sync": true,
+    "require_time_sync_for_tls": true,
     "https_port": 443
   },
   "mqtt": {

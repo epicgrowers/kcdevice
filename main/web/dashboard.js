@@ -10,6 +10,12 @@ let focusSensorAddress=null;
 let focusSensorTimer=null;
 let focusPauseIssued=false;
 let currentTab=0;
+const LOG_TAB_INDEX=5;
+const LOG_FILTERS=['ALL','ERROR','WARNING','SENSOR'];
+const LOG_POLL_INTERVAL_MS=5000;
+let logEntries=[];
+let logFilter='ALL';
+let logPollingTimer=null;
 const SENSOR_WS_PATH='/ws/sensors';
 let sensorSocket=null;
 let sensorSocketReady=false;
@@ -204,7 +210,7 @@ if(wasPauseRequired&&!isPauseRequired){
   await pauseSensors(true);
 }
 
-document.querySelectorAll('.tab').forEach((t,i)=>{if(i===n){t.className='px-6 py-3 text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 font-semibold tab active';}else{t.className='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab';}});document.querySelectorAll('.tab-content').forEach((c,i)=>{c.style.display=(i===n)?'block':'none';});if(n===1)loadSensors();if(n===2){loadSettings();loadDeviceInfo();}}
+document.querySelectorAll('.tab').forEach((t,i)=>{if(i===n){t.className='px-6 py-3 text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 font-semibold tab active';}else{t.className='px-6 py-3 text-gray-600 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-900 dark:hover:text-white tab';}});document.querySelectorAll('.tab-content').forEach((c,i)=>{c.style.display=(i===n)?'block':'none';});if(n===1)loadSensors();if(n===2){loadSettings();loadDeviceInfo();}if(n===LOG_TAB_INDEX){await loadLogs(true);startLogPolling();}else if(previousTab===LOG_TAB_INDEX){stopLogPolling();}}
 async function loadDeviceInfo(){try{const res=await fetch('/api/device/info');if(!res.ok)throw new Error('Failed to load device info');const data=await res.json();document.getElementById('device-id').value=data.device_id||'';document.getElementById('device-name').value=data.device_name||'';}catch(e){console.error('Failed to load device info:',e);}}
 async function saveDeviceName(){try{const deviceName=document.getElementById('device-name').value.trim();if(deviceName&&deviceName.length>64){alert('Device name must be 64 characters or less');return;}const res=await fetch('/api/device/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_name:deviceName})});if(!res.ok){const text=await res.text();throw new Error(text||'Failed to save device name');}const data=await res.json();document.getElementById('device-name').value=data.device_name||'';alert('Device name saved successfully!');}catch(e){console.error('Failed to save device name:',e);alert('Error: '+e.message);}}
 async function clearDeviceName(){try{const res=await fetch('/api/device/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_name:''})});if(!res.ok)throw new Error('Failed to clear device name');document.getElementById('device-name').value='';alert('Device name cleared!');}catch(e){console.error('Failed to clear device name:',e);alert('Error: '+e.message);}}
@@ -213,7 +219,7 @@ async function saveSettings(){try{const mqttInterval=parseInt(document.getElemen
 async function resetSettings(){try{if(!confirm('Reset both intervals to 10 seconds (default)?'))return;const res=await fetch('/api/settings/reset',{method:'POST'});if(!res.ok)throw new Error('Failed to reset settings');const data=await res.json();document.getElementById('mqtt-interval').value=data.mqtt_interval;document.getElementById('sensor-interval').value=data.sensor_interval;alert('Settings reset to defaults (10 seconds)!');}catch(e){alert('Failed to reset settings: '+e.message);}}
 let isLoadingStatus=false;
 async function safeLoadStatus(){if(isLoadingStatus||(focusModeActive&&!focusUsingWebSocket))return;isLoadingStatus=true;try{await loadStatus();}catch(e){console.error('Status load failed:',e);}finally{isLoadingStatus=false;}}
-async function initializeDashboard(){loadTheme();await ensureSensorsResumed();await safeLoadStatus();initSensorSocket();const modal=document.getElementById('sensorModal');if(modal){modal.addEventListener('click',e=>{if(e.target===modal){closeSensorModal();}});}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSensorModal();});setInterval(safeLoadStatus,10000);}
+async function initializeDashboard(){loadTheme();await ensureSensorsResumed();await safeLoadStatus();initSensorSocket();const modal=document.getElementById('sensorModal');if(modal){modal.addEventListener('click',e=>{if(e.target===modal){closeSensorModal();}});}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSensorModal();});setLogFilter(logFilter);setInterval(safeLoadStatus,10000);}
 async function ensureSensorsResumed(){try{await fetch('/api/sensors/resume',{method:'POST'});}catch(e){console.warn('Resume on init failed:',e);}}
 
 // Code Editor Functions
@@ -790,6 +796,32 @@ async function setEcTempComp(address){const input=document.getElementById(`ec-te
 async function updateEcOutputParams(address){const ec=document.getElementById(`param-ec-${address}`)?.checked||false;const tds=document.getElementById(`param-tds-${address}`)?.checked||false;const s=document.getElementById(`param-s-${address}`)?.checked||false;const sg=document.getElementById(`param-sg-${address}`)?.checked||false;try{const res=await fetch(`/api/sensors/ec-output-params/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ec,tds,s,sg})});if(!res.ok)throw new Error('Failed to update output parameters');alert('✓ EC output parameters updated');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
 
 async function updateHumOutputParams(address){const hum=document.getElementById(`param-hum-${address}`)?.checked||false;const t=document.getElementById(`param-t-${address}`)?.checked||false;const dew=document.getElementById(`param-dew-${address}`)?.checked||false;try{const res=await fetch(`/api/sensors/hum-output-params/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hum,t,dew})});if(!res.ok)throw new Error('Failed to update output parameters');alert('✓ HUM output parameters updated');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
+
+// Log Viewer
+function normalizeLogLevel(entry){const category=typeof entry?.category==='number'?entry.category:null;if(category===2)return'ERROR';if(category===1)return'WARNING';if(category===3)return'SENSOR';const raw=(entry&&entry.level?String(entry.level):'').trim().toUpperCase();if(raw.startsWith('ERR'))return'ERROR';if(raw.startsWith('WARN'))return'WARNING';if(raw.startsWith('SENSOR'))return'SENSOR';const tag=(entry&&entry.tag?String(entry.tag):'').trim().toUpperCase();if(tag==='SENSOR')return'SENSOR';return'INFO';}
+function setLogFilter(filter){const normalized=(LOG_FILTERS.includes(filter)?filter:'ALL');logFilter=normalized;document.querySelectorAll('[data-log-filter]').forEach(btn=>{const value=btn.getAttribute('data-log-filter');if(value===normalized){btn.classList.add('log-filter-active');}else{btn.classList.remove('log-filter-active');}});renderLogEntries();}
+
+async function loadLogs(manual=false){const status=document.getElementById('logStatus');if(status&&manual){status.textContent='Refreshing...';}try{const res=await fetch('/api/logs',{signal:AbortSignal.timeout(5000)});if(!res.ok)throw new Error('Failed to load logs');const data=await res.json();logEntries=Array.isArray(data.entries)?data.entries:[];renderLogEntries();if(status){status.textContent=`Updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}if(manual){const list=document.getElementById('logList');if(list){list.innerHTML=`<div class='text-red-500 dark:text-red-400'>${escapeHtml(err.message||'Failed to load logs')}</div>`;}}}}
+
+function startLogPolling(){if(logPollingTimer)return;logPollingTimer=setInterval(()=>{loadLogs();},LOG_POLL_INTERVAL_MS);}
+
+function stopLogPolling(){if(!logPollingTimer)return;clearInterval(logPollingTimer);logPollingTimer=null;}
+
+function renderLogEntries(){const list=document.getElementById('logList');if(!list)return;const activeFilter=logFilter||'ALL';const filtered=logEntries.filter(entry=>{const level=normalizeLogLevel(entry);return activeFilter==='ALL'||level===activeFilter;});if(filtered.length===0){list.innerHTML=`<div class='text-gray-500 dark:text-gray-400 text-sm'>No ${activeFilter==='ALL'?'recent':'matching'} logs yet.</div>`;return;}list.innerHTML=filtered.map(renderLogEntry).join('');}
+
+function renderLogEntry(entry){const level=normalizeLogLevel(entry);const tag=escapeHtml(entry.tag||'LOG');const ageLabel=describeLogAge(entry.age_sec);const message=level==='SENSOR'?formatSensorLog(entry.message):escapeHtml(entry.message||'');const levelClass=level.toLowerCase();return `<div class='log-entry log-entry-${levelClass}'>`+
+`<div class='flex items-center justify-between mb-2'>`+
+`<div class='flex items-center gap-2'><span class='log-level-badge'>${level}</span><span class='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>${tag}</span></div>`+
+`<span class='text-xs text-gray-500 dark:text-gray-400'>${ageLabel}</span>`+
+`</div>`+
+`<div class='log-message'>${message}</div>`+
+`</div>`;}
+
+function formatSensorLog(raw){try{const parsed=JSON.parse(raw||'{}');const count=parsed.sensor_count??(parsed.sensors?Object.keys(parsed.sensors).length:0);const battery=parsed.battery??parsed.battery_percentage;const snapshot=parsed.timestamp?`@ ${parsed.timestamp}`:'';const sensorList=parsed.sensors?Object.keys(parsed.sensors).slice(0,3).join(', '):'sensors';const extras=[];if(typeof battery==='number'){extras.push(`${battery.toFixed(1)}% batt`);}if(typeof parsed.rssi==='number'){extras.push(`${parsed.rssi} dBm`);}const meta=extras.length?` • ${extras.join(' | ')}`:'';return escapeHtml(`${count||0} readings ${snapshot} (${sensorList})${meta}`);}catch(e){return escapeHtml(raw||'');}}
+
+function describeLogAge(ageSec){if(!Number.isFinite(ageSec))return'just now';if(ageSec<1){return`${Math.round(ageSec*1000)} ms ago`;}if(ageSec<60){return`${Math.round(ageSec)} s ago`;}const minutes=ageSec/60;if(minutes<60)return`${Math.round(minutes)} min ago`;const hours=minutes/60;if(hours<24)return`${Math.round(hours)} h ago`;return `${Math.round(hours/24)} d ago`;}
+
+function escapeHtml(value){return (value??'').toString().replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[char]||char));}
 
 // Manual Mode Terminal Session Management
 let manualTerminalSession = [];

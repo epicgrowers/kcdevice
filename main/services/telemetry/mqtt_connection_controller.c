@@ -234,7 +234,7 @@ void mqtt_connection_controller_handle_connected(void)
 void mqtt_connection_controller_handle_disconnected(void)
 {
     mqtt_connection_controller_update_transition(MQTT_STATE_DISCONNECTED);
-    s_mqtt_client_running = false;
+    // Keep client running; esp-mqtt handles its own reconnect backoff
     s_mqtt_reconnects++;
     mqtt_connection_controller_note_failure();
 }
@@ -242,6 +242,6 @@ void mqtt_connection_controller_handle_disconnected(void)
 void mqtt_connection_controller_handle_error(void)
 {
     mqtt_connection_controller_update_transition(MQTT_STATE_ERROR);
-    s_mqtt_client_running = false;
+    // Leave client running so the supervisor doesn't restart an active stack
     mqtt_connection_controller_note_failure();
 }

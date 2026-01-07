@@ -1,4 +1,4 @@
-/* * Data converted from C:/Code/kc_device/build_s3/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from C:/Code/kc/build_s3/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

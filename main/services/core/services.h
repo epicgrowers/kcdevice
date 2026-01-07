@@ -58,6 +58,7 @@ typedef struct {
     bool enable_mqtt;
     bool enable_mdns;
     bool enable_time_sync;
+    bool require_time_sync_for_tls;
     bool tls_ready;
     bool time_synced;
     uint16_t https_port;
@@ -95,6 +96,8 @@ esp_err_t services_start(const services_config_t *config,
 esp_err_t services_stop(void);
 
 void services_report_degraded(const char *component, esp_err_t result);
+
+esp_err_t services_handle_network_recovered(void);
 
 #ifdef __cplusplus
 }

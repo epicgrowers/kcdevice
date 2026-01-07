@@ -210,6 +210,16 @@ esp_err_t provisioning_run(const provisioning_plan_t *plan, provisioning_outcome
         if (ret == ESP_OK && outcome != NULL && outcome->connected) {
             return ESP_OK;
         }
+
+        if (ret != ESP_ERR_NOT_FOUND && ret != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "Stored credentials present but WiFi connect failed (%s); keeping BLE provisioning disabled while WiFi manager retries",
+                     esp_err_to_name(ret));
+            if (outcome != NULL) {
+                outcome->waiting_for_wifi_retry = true;
+            }
+            return ESP_OK;
+        }
     }
 
     ret = run_ble_provisioning(plan, outcome);

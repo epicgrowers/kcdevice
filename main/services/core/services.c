@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "services/discovery/mdns_service.h"
 #include "services/http/http_server.h"
+#include "services/telemetry/mqtt_connection_controller.h"
 #include "services/telemetry/mqtt_telemetry.h"
 #include "services/time_sync/time_sync.h"
 
@@ -32,6 +33,9 @@ static void services_set_ready_bit(void);
 static void services_set_degraded_bit(void);
 static void services_handle_fault(const services_status_event_t *event);
 static bool services_wait_for_time_sync(uint32_t timeout_sec);
+static bool services_time_sync_required_for_tls(void);
+static bool services_ensure_time_sync_ready(const char *component);
+static void services_start_time_sync(void);
 
 static void services_emit_event(services_event_type_t type,
                                 esp_err_t result,
@@ -73,6 +77,34 @@ static void services_set_degraded_bit(void)
     xEventGroupSetBits(s_state.deps.boot_event_group, s_state.deps.degraded_bit);
 }
 
+esp_err_t services_handle_network_recovered(void)
+{
+    if (!s_state.running) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Network recovery detected; evaluating dependent services");
+
+    if (s_state.config.enable_time_sync) {
+        bool needs_sync = !time_sync_is_synced() || !s_state.time_sync_ready;
+        if (needs_sync) {
+            if (s_state.time_sync_started) {
+                time_sync_deinit();
+                s_state.time_sync_started = false;
+                s_state.time_sync_ready = false;
+            }
+            services_start_time_sync();
+        }
+    }
+
+    if (s_state.config.enable_mqtt && s_state.mqtt_initialized) {
+        mqtt_connection_controller_request_run(true);
+    }
+
+    services_emit_event(SERVICES_EVENT_READY, ESP_OK, "network_recovered");
+    return ESP_OK;
+}
+
 static void services_handle_fault(const services_status_event_t *event)
 {
     if (event == NULL || event->type != SERVICES_EVENT_DEGRADED) {
@@ -98,6 +130,36 @@ static bool services_wait_for_time_sync(uint32_t timeout_sec)
     }
 
     return time_sync_is_synced();
+}
+
+static bool services_time_sync_required_for_tls(void)
+{
+    if (!s_state.config.require_time_sync_for_tls) {
+        return false;
+    }
+
+    if (!s_state.config.enable_time_sync) {
+        return false;
+    }
+
+    if (s_state.time_sync_ready || s_state.config.time_synced) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool services_ensure_time_sync_ready(const char *component)
+{
+    if (!services_time_sync_required_for_tls()) {
+        return true;
+    }
+
+    ESP_LOGW(TAG,
+             "%s startup blocked: time sync not ready",
+             (component != NULL) ? component : "unknown");
+    services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, component);
+    return false;
 }
 
 static void services_start_time_sync(void)
@@ -178,8 +240,13 @@ static void services_start_mdns(void)
         return;
     }
 
+    if (!services_ensure_time_sync_ready("mdns")) {
+        return;
+    }
+
     if (!s_state.config.tls_ready) {
         ESP_LOGW(TAG, "TLS assets unavailable; skipping mDNS service");
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, "mdns");
         return;
     }
 
@@ -217,8 +284,13 @@ static void services_start_http(void)
     services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_NOT_SUPPORTED, "http");
     return;
 #else
+    if (!services_ensure_time_sync_ready("http")) {
+        return;
+    }
+
     if (!s_state.config.tls_ready) {
         ESP_LOGW(TAG, "TLS assets unavailable; skipping HTTPS server startup");
+        services_emit_event(SERVICES_EVENT_DEGRADED, ESP_ERR_INVALID_STATE, "http");
         return;
     }
 
@@ -253,6 +325,10 @@ static void services_start_http(void)
 static void services_start_mqtt(void)
 {
     if (!s_state.config.enable_mqtt) {
+        return;
+    }
+
+    if (!services_ensure_time_sync_ready("mqtt")) {
         return;
     }
 
