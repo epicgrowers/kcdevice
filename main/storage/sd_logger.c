@@ -42,6 +42,7 @@ static sdmmc_card_t *s_card = NULL;
 static bool s_sd_mounted = false;
 static FILE *s_sensor_file = NULL;
 static FILE *s_event_file = NULL;
+static char s_event_file_path[128] = {0};
 static int s_sensor_day_key = -1;
 static int s_event_day_key = -1;
 static uint32_t s_last_persisted_sequence = 0;
@@ -234,6 +235,7 @@ static void sd_logger_close_file_locked(void)
         fclose(s_event_file);
         s_event_file = NULL;
     }
+    s_event_file_path[0] = '\0';
 }
 
 static esp_err_t sd_logger_ensure_log_dir_locked(void)
@@ -339,6 +341,7 @@ static esp_err_t sd_logger_prepare_event_file_locked(const struct tm *utc_time)
     }
 
     s_event_day_key = day_key;
+    strlcpy(s_event_file_path, path, sizeof(s_event_file_path));
     ESP_LOGI(TAG, "Logging device events to %s", path);
     return ESP_OK;
 }
@@ -430,12 +433,18 @@ static esp_err_t sd_logger_flush_log_history_locked(void)
     size_t count = log_history_get_entries(LOG_HISTORY_FILTER_ALL,
                                            LOG_HISTORY_STORAGE_DEPTH,
                                            history_buffer);
+    ESP_LOGI(TAG,
+             "Flush batch pulled %u entries (last seq %u)",
+             (unsigned)count,
+             (unsigned)s_last_persisted_sequence);
     if (count == 0) {
         heap_caps_free(history_buffer);
         return ESP_OK;
     }
 
     size_t lines_written = 0;
+    uint32_t first_seq_written = 0;
+    uint32_t last_seq_written = 0;
     for (ssize_t idx = (ssize_t)count - 1; idx >= 0; --idx) {
         const log_history_entry_t *entry = &history_buffer[idx];
         if (entry->sequence == 0 || entry->sequence <= s_last_persisted_sequence) {
@@ -464,6 +473,10 @@ static esp_err_t sd_logger_flush_log_history_locked(void)
 
         if (fprintf(s_event_file, "%s\n", line) > 0) {
             lines_written++;
+            if (first_seq_written == 0) {
+                first_seq_written = entry->sequence;
+            }
+            last_seq_written = entry->sequence;
             s_last_persisted_sequence = entry->sequence;
         }
         free(line);
@@ -471,7 +484,35 @@ static esp_err_t sd_logger_flush_log_history_locked(void)
 
     if (lines_written > 0) {
         fflush(s_event_file);
+        int fd = fileno(s_event_file);
+        if (fd >= 0) {
+            if (fsync(fd) != 0) {
+                ESP_LOGW(TAG, "fsync failed for event log (errno=%d)", errno);
+            }
+        }
     }
+    if (s_event_file != NULL) {
+        long pos = ftell(s_event_file);
+        if (pos >= 0) {
+            struct stat st = {0};
+            long stat_size = -1;
+            if (s_event_file_path[0] != '\0' && stat(s_event_file_path, &st) == 0) {
+                stat_size = (long)st.st_size;
+            }
+            ESP_LOGI(TAG,
+                     "Event log %s size %ld bytes after flush (stat=%ld)",
+                     (s_event_file_path[0] != '\0') ? s_event_file_path : "<unknown>",
+                     pos,
+                     stat_size);
+        } else {
+            ESP_LOGW(TAG, "ftell failed for event log (errno=%d)", errno);
+        }
+    }
+    ESP_LOGI(TAG,
+             "Flush wrote %u entries (seq %u-%u)",
+             (unsigned)lines_written,
+             (unsigned)first_seq_written,
+             (unsigned)last_seq_written);
     heap_caps_free(history_buffer);
     return ESP_OK;
 }
@@ -600,6 +641,7 @@ static void sd_logger_process_cycle(void)
     esp_err_t event_prep = sd_logger_prepare_event_file_locked(&utc_time);
     if (event_prep == ESP_OK) {
         esp_err_t flush_ret = sd_logger_flush_log_history_locked();
+        ESP_LOGI(TAG, "Flush cycle status: %s", esp_err_to_name(flush_ret));
         if (flush_ret != ESP_OK && flush_ret != ESP_ERR_INVALID_STATE) {
             ESP_LOGW(TAG, "Failed to flush log history: %s", esp_err_to_name(flush_ret));
         }

@@ -42,6 +42,7 @@ static const char *TAG = "HTTP_SERVER";
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
 
 static httpd_handle_t s_server = NULL;
 static http_server_config_t s_http_config = {0};
@@ -264,6 +265,26 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str)
         return ESP_ERR_NOT_FOUND;
     }
 
+    struct stat st = {0};
+    long handle_size = -1;
+    if (fseek(file, 0, SEEK_END) == 0) {
+        long pos = ftell(file);
+        if (pos >= 0) {
+            handle_size = pos;
+        }
+        fseek(file, 0, SEEK_SET);
+    }
+    if (stat(path, &st) == 0) {
+        ESP_LOGI(TAG,
+                 "SD logs %s opened %s (stat=%ld handle=%ld)",
+                 date_str,
+                 path,
+                 (long)st.st_size,
+                 handle_size);
+    } else {
+        ESP_LOGW(TAG, "Failed to stat %s (errno=%d)", path, errno);
+    }
+
     cJSON *root = cJSON_CreateObject();
     cJSON *items = cJSON_CreateArray();
     if (root == NULL || items == NULL) {
@@ -279,6 +300,7 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str)
     }
 
     char line[768];
+    size_t parse_errors = 0;
     size_t count = 0;
     while (fgets(line, sizeof(line), file) != NULL) {
         size_t len = strlen(line);
@@ -290,6 +312,14 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str)
         }
         cJSON *item = cJSON_Parse(line);
         if (item == NULL) {
+            if (parse_errors < 5) {
+                ESP_LOGW(TAG,
+                         "Failed to parse log line %zu from %s: %.64s",
+                         count,
+                         path,
+                         line);
+            }
+            parse_errors++;
             continue;
         }
         if (count >= LOG_API_MAX_ENTRIES) {
@@ -305,6 +335,11 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str)
     cJSON_AddNumberToObject(root, "count", count);
     cJSON_AddStringToObject(root, "source", "sd");
     cJSON_AddStringToObject(root, "date", date_str);
+    ESP_LOGI(TAG,
+             "SD logs %s returning %u entries (parse_errors=%u)",
+             date_str,
+             (unsigned)count,
+             (unsigned)parse_errors);
 
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
