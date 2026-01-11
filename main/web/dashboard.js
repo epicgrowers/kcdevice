@@ -61,6 +61,8 @@ let logSequence=0;
 let logIngressHistory=[];
 let logContextDrawer=null;
 let logLastRenderedIds=new Set();
+let logSource='live';
+let logArchiveDate='';
 const SENSOR_WS_PATH='/ws/sensors';
 let sensorSocket=null;
 let sensorSocketReady=false;
@@ -843,9 +845,18 @@ async function updateEcOutputParams(address){const ec=document.getElementById(`p
 async function updateHumOutputParams(address){const hum=document.getElementById(`param-hum-${address}`)?.checked||false;const t=document.getElementById(`param-t-${address}`)?.checked||false;const dew=document.getElementById(`param-dew-${address}`)?.checked||false;try{const res=await fetch(`/api/sensors/hum-output-params/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hum,t,dew})});if(!res.ok)throw new Error('Failed to update output parameters');alert('✓ HUM output parameters updated');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
 
 // Log Viewer
-function initializeLogConsole(){if(logInitialized)return;logTerminalEl=document.getElementById('logTerminal');logJumpButton=document.getElementById('logJumpToLatest');logContextDrawer=document.getElementById('logContextDrawer');if(!logTerminalEl)return;loadCustomLogGroups();loadLogAlertRules();buildLogGroupFilters();renderLogLegend();renderLogBookmarks();renderLogStats();attachLogEventHandlers();const autoToggle=document.getElementById('logAutoScrollToggle');if(autoToggle)autoToggle.checked=logAutoScroll;logInitialized=true;}
+function normalizeLogArchiveDate(value){if(!value)return'';const match=value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!match)return'';const year=Number(match[1]);const month=Number(match[2]);const day=Number(match[3]);if(year<2000||year>2099||month<1||month>12||day<1||day>31)return'';const utcDate=new Date(Date.UTC(year,month-1,day));if(utcDate.getUTCFullYear()!==year||utcDate.getUTCMonth()+1!==month||utcDate.getUTCDate()!==day)return'';return`${match[1]}-${match[2]}-${match[3]}`;}
+function initializeLogConsole(){if(logInitialized)return;logTerminalEl=document.getElementById('logTerminal');logJumpButton=document.getElementById('logJumpToLatest');logContextDrawer=document.getElementById('logContextDrawer');if(!logTerminalEl)return;loadCustomLogGroups();loadLogAlertRules();buildLogGroupFilters();renderLogLegend();renderLogBookmarks();renderLogStats();attachLogEventHandlers();const autoToggle=document.getElementById('logAutoScrollToggle');if(autoToggle)autoToggle.checked=logAutoScroll;updateLogSourceControls();logInitialized=true;}
 
 function ensureLogConsoleReady(){if(!logInitialized){initializeLogConsole();}}
+
+function handleLogSourceChange(value){const next=value==='sd'?'sd':'live';if(logSource===next)return;logSource=next;updateLogSourceControls();if(logSource==='live'){startLogPolling();loadLogs(true);}else{stopLogPolling();if(!logArchiveDate){const status=document.getElementById('logStatus');if(status){status.textContent='Select a date to load archive logs';}}else{loadLogs(true);}}}
+
+function handleLogArchiveDate(value){const normalized=normalizeLogArchiveDate(value);const dateInput=document.getElementById('logArchiveDate');if(!normalized){if(value){showLogToast('Enter a valid date (YYYY-MM-DD, 2000-2099)');}logArchiveDate='';if(dateInput&&dateInput.value){dateInput.value='';}return;}logArchiveDate=normalized;if(dateInput&&dateInput.value!==normalized){dateInput.value=normalized;}if(logSource==='sd'){loadLogs(true);}}
+
+function loadArchiveLogs(){if(logSource!=='sd')return;if(!logArchiveDate){showLogToast('Select a date first');return;}loadLogs(true);}
+
+function updateLogSourceControls(){const dateInput=document.getElementById('logArchiveDate');const loadButton=document.getElementById('logArchiveLoad');if(dateInput){if(logSource==='sd'){dateInput.style.display='inline-flex';}else{dateInput.style.display='none';dateInput.value='';logArchiveDate='';}}if(loadButton){loadButton.style.display=logSource==='sd'?'inline-flex':'none';}}
 
 function attachLogEventHandlers(){if(!logTerminalEl)return;logTerminalEl.addEventListener('scroll',handleLogScrollEvent);logTerminalEl.addEventListener('click',handleLogTerminalClick);logTerminalEl.addEventListener('mouseover',handleLogHover);logTerminalEl.addEventListener('mouseleave',clearCorrelationHighlight);}
 
@@ -857,9 +868,9 @@ function buildLogGroupFilters(){const defaultContainer=document.getElementById('
 
 function setActiveLogGroup(key){if(!key)return;logActiveGroup=key;document.querySelectorAll('[data-log-group]').forEach(btn=>{const isActive=btn.getAttribute('data-log-group')===key;btn.classList.toggle('active',isActive);});renderLogEntries();}
 
-async function loadLogs(manual=false){ensureLogConsoleReady();const status=document.getElementById('logStatus');if(status&&manual){status.textContent='Refreshing...';}try{const res=await fetch('/api/logs',{signal:AbortSignal.timeout(5000)});if(!res.ok)throw new Error('Failed to load logs');const data=await res.json();const entries=Array.isArray(data.entries)?data.entries:[];ingestLogEntries(entries);if(status){status.textContent=`Updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}showLogToast(`Log fetch failed: ${err.message}`);}}
+async function loadLogs(manual=false){ensureLogConsoleReady();const status=document.getElementById('logStatus');if(status&&manual){status.textContent=logSource==='sd'?'Loading archive...':'Refreshing...';}const params=new URLSearchParams();if(logSource==='sd'){const normalized=normalizeLogArchiveDate(logArchiveDate);if(!normalized){if(status){status.textContent='Select a valid archive date';}if(manual){showLogToast('Select a valid archive date (YYYY-MM-DD, 2000-2099)');}return;}logArchiveDate=normalized;params.set('source','sd');params.set('date',normalized);}const url=params.toString()?`/api/logs?${params.toString()}`:'/api/logs';try{const res=await fetch(url,{signal:AbortSignal.timeout(5000)});if(!res.ok){const errText=await res.text();throw new Error(errText||'Failed to load logs');}const data=await res.json();const entries=Array.isArray(data.entries)?data.entries:[];ingestLogEntries(entries,{reset:logSource==='sd',trackRate:logSource==='live'});if(status){const label=logSource==='sd'?`Archive ${logArchiveDate}`:'Live log';status.textContent=`${label} updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}showLogToast(`Log fetch failed: ${err.message}`);}}
 
-function ingestLogEntries(entries){if(!entries||entries.length===0)return;let appended=false;entries.forEach(raw=>{const normalized=normalizeLogEntry(raw);if(!normalized)return;logBuffer.push(normalized);logIngressHistory.push(normalized.ts);if(logIngressHistory.length>500){logIngressHistory.shift();}appended=true;evaluateAlertRules(normalized);});if(!appended)return;if(logBuffer.length>LOG_MAX_BUFFER){logBuffer=logBuffer.slice(-LOG_MAX_BUFFER);}renderLogEntries();}
+function ingestLogEntries(entries,options={}){const{reset=false,trackRate=true}=options;if(reset){logBuffer=[];logIngressHistory=[];logPinnedIds.clear();logBookmarks=[];logBaselineTimestamp=null;logLastRenderedIds=new Set();}if(!entries||entries.length===0){if(reset){renderLogEntries();}return;}let appended=false;entries.forEach(raw=>{const normalized=normalizeLogEntry(raw);if(!normalized)return;logBuffer.push(normalized);if(trackRate){logIngressHistory.push(normalized.ts);if(logIngressHistory.length>500){logIngressHistory.shift();}}appended=true;evaluateAlertRules(normalized);});if(!appended)return;if(logBuffer.length>LOG_MAX_BUFFER){logBuffer=logBuffer.slice(-LOG_MAX_BUFFER);}if(!trackRate){logIngressHistory=[];}renderLogEntries();}
 
 function normalizeLogEntry(raw){if(!raw)return null;const now=Date.now();const ageMs=Number(raw.age_sec)*1000;let ts=raw.timestamp?Date.parse(raw.timestamp):Number(raw.ts);if(!Number.isFinite(ts)&&Number.isFinite(ageMs)){ts=now-ageMs;}if(!Number.isFinite(ts))ts=now;const tag=String(raw.tag||'OTHER').trim().toUpperCase();const level=String(raw.level||'INFO').trim().toUpperCase();const message=typeof raw.message==='string'?raw.message:JSON.stringify(raw.message??'');const severity=detectLogSeverity(level,message);const color=resolveLogColor(tag);const correlationId=extractCorrelationId(raw,message);const group=resolveLogGroup(tag);return{ id:`log-${++logSequence}`, ts, tag, level, message, severity, color, correlationId, groupKey:group.key, groupLabel:group.label, displayTime:new Date(ts).toLocaleTimeString(), raw };}
 
@@ -873,7 +884,7 @@ function matchesPattern(tag,pattern){if(!pattern)return false;const trimmed=patt
 
 function extractCorrelationId(raw,message){if(raw&&raw.correlation_id)return String(raw.correlation_id);const text=message||'';const match=text.match(/(?:corr(?:elation)?|trace|cid)[^A-Za-z0-9]?([A-Za-z0-9-]{4,})/i);return match?match[1].toUpperCase():null;}
 
-function startLogPolling(){if(logPollingTimer)return;logPollingTimer=setInterval(()=>{loadLogs();},LOG_POLL_INTERVAL_MS);}
+function startLogPolling(){if(logSource!=='live'||logPollingTimer)return;logPollingTimer=setInterval(()=>{loadLogs();},LOG_POLL_INTERVAL_MS);}
 
 function stopLogPolling(){if(!logPollingTimer)return;clearInterval(logPollingTimer);logPollingTimer=null;}
 

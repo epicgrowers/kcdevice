@@ -6,6 +6,9 @@
 extern "C" {
 #endif
 
+#define SD_LOGGER_MOUNT_POINT "/sdcard"
+#define SD_LOGGER_LOG_DIR     SD_LOGGER_MOUNT_POINT "/logs"
+
 /**
  * @brief Initialize the SD card logger and start its background task.
  *

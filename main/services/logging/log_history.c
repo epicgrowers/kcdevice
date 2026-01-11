@@ -1,5 +1,6 @@
 #include "services/logging/log_history.h"
 
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -10,11 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#define LOG_HISTORY_STORAGE_DEPTH   256
 #define LOG_HISTORY_LINE_BUFFER_LEN 384
 
+static const char *TAG = "LOG_HISTORY";
 static SemaphoreHandle_t s_log_mutex;
-static log_history_entry_t s_entries[LOG_HISTORY_STORAGE_DEPTH];
+static log_history_entry_t *s_entries;
 static size_t s_write_index;
 static size_t s_entry_count;
 static uint32_t s_sequence_counter;
@@ -35,6 +36,16 @@ esp_err_t log_history_init(void)
 
     s_log_mutex = xSemaphoreCreateMutex();
     if (s_log_mutex == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    s_entries = heap_caps_calloc(LOG_HISTORY_STORAGE_DEPTH,
+                                 sizeof(log_history_entry_t),
+                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_entries == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate log history buffer");
+        vSemaphoreDelete(s_log_mutex);
+        s_log_mutex = NULL;
         return ESP_ERR_NO_MEM;
     }
 

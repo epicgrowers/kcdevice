@@ -1,6 +1,7 @@
 #include "storage/sd_logger.h"
 
 #include "sdkconfig.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 
 #if CONFIG_KC_SD_LOGGER_ENABLED
@@ -25,14 +26,13 @@
 #include "sensors/sensor_manager.h"
 #include "services/logging/log_history.h"
 
-#define SD_LOGGER_TASK_NAME           "sd_logger"
-#define SD_LOGGER_TASK_STACK_WORDS    4096
-#define SD_LOGGER_TASK_PRIORITY       4
-#define SD_LOGGER_MOUNT_POINT         "/sdcard"
-#define SD_LOGGER_LOG_DIR             SD_LOGGER_MOUNT_POINT "/logs"
-#define SD_LOGGER_FILENAME_TEMPLATE   SD_LOGGER_LOG_DIR "/%Y%m%d.ndjson"
-#define SD_LOGGER_MIN_INTERVAL_SEC    5U
-#define SD_LOGGER_RETRY_INTERVAL_MS   10000
+#define SD_LOGGER_TASK_NAME                "sd_logger"
+#define SD_LOGGER_TASK_STACK_WORDS         4096
+#define SD_LOGGER_TASK_PRIORITY            4
+#define SD_LOGGER_SENSOR_FILENAME_TEMPLATE SD_LOGGER_LOG_DIR "/%Y%m%d.ndjson"
+#define SD_LOGGER_EVENT_FILENAME_TEMPLATE  SD_LOGGER_LOG_DIR "/%Y%m%d.log"
+#define SD_LOGGER_MIN_INTERVAL_SEC         5U
+#define SD_LOGGER_RETRY_INTERVAL_MS        10000
 
 static const char *TAG = "SD_LOGGER";
 
@@ -40,8 +40,11 @@ static TaskHandle_t s_logger_task_handle = NULL;
 static SemaphoreHandle_t s_file_mutex = NULL;
 static sdmmc_card_t *s_card = NULL;
 static bool s_sd_mounted = false;
-static FILE *s_log_file = NULL;
-static int s_open_day_key = -1;
+static FILE *s_sensor_file = NULL;
+static FILE *s_event_file = NULL;
+static int s_sensor_day_key = -1;
+static int s_event_day_key = -1;
+static uint32_t s_last_persisted_sequence = 0;
 static int64_t s_last_mount_attempt_us = 0;
 static bool s_card_reported_missing = false;
 static bool s_spi_bus_initialized = false;
@@ -51,11 +54,15 @@ static void sd_logger_unmount_card(void);
 static bool sd_logger_card_present(void);
 static void sd_logger_task(void *arg);
 static uint32_t sd_logger_interval_ms(void);
-static esp_err_t sd_logger_prepare_log_path_locked(const struct tm *utc_time);
-static esp_err_t sd_logger_write_entry_locked(const sensor_cache_t *cache,
-                                              time_t timestamp);
+static esp_err_t sd_logger_prepare_sensor_file_locked(const struct tm *utc_time);
+static esp_err_t sd_logger_prepare_event_file_locked(const struct tm *utc_time);
+static esp_err_t sd_logger_write_sensor_snapshot_locked(const sensor_cache_t *cache,
+                                                       time_t timestamp);
+static esp_err_t sd_logger_flush_log_history_locked(void);
 static void sd_logger_add_sensor_payload(cJSON *sensors, const cached_sensor_t *sensor);
 static void sd_logger_close_file_locked(void);
+static const char *sd_logger_category_to_string(log_history_category_t category);
+static void sd_logger_format_timestamp_iso(int64_t timestamp_us, char *buf, size_t buf_len);
 
 static uint32_t sd_logger_interval_ms(void)
 {
@@ -179,7 +186,8 @@ static esp_err_t sd_logger_mount_card(void)
     }
 
     s_sd_mounted = true;
-    s_open_day_key = -1;
+    s_sensor_day_key = -1;
+    s_event_day_key = -1;
     sd_logger_report_card_state(true);
 
     uint64_t capacity_bytes = (uint64_t)s_card->csd.capacity * s_card->csd.sector_size;
@@ -200,7 +208,8 @@ static void sd_logger_unmount_card(void)
     esp_vfs_fat_sdcard_unmount(SD_LOGGER_MOUNT_POINT, s_card);
     s_card = NULL;
     s_sd_mounted = false;
-    s_open_day_key = -1;
+    s_sensor_day_key = -1;
+    s_event_day_key = -1;
     ESP_LOGW(TAG, "SD card unmounted");
 
     if (s_spi_bus_initialized) {
@@ -215,10 +224,15 @@ static void sd_logger_unmount_card(void)
 
 static void sd_logger_close_file_locked(void)
 {
-    if (s_log_file != NULL) {
-        fflush(s_log_file);
-        fclose(s_log_file);
-        s_log_file = NULL;
+    if (s_sensor_file != NULL) {
+        fflush(s_sensor_file);
+        fclose(s_sensor_file);
+        s_sensor_file = NULL;
+    }
+    if (s_event_file != NULL) {
+        fflush(s_event_file);
+        fclose(s_event_file);
+        s_event_file = NULL;
     }
 }
 
@@ -249,18 +263,22 @@ static int sd_logger_compute_day_key(const struct tm *utc_time)
     return (utc_time->tm_year + 1900) * 1000 + utc_time->tm_yday;
 }
 
-static esp_err_t sd_logger_prepare_log_path_locked(const struct tm *utc_time)
+static esp_err_t sd_logger_prepare_sensor_file_locked(const struct tm *utc_time)
 {
     if (utc_time == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
 
     int day_key = sd_logger_compute_day_key(utc_time);
-    if (s_log_file != NULL && day_key == s_open_day_key) {
+    if (s_sensor_file != NULL && day_key == s_sensor_day_key) {
         return ESP_OK;
     }
 
-    sd_logger_close_file_locked();
+    if (s_sensor_file != NULL) {
+        fflush(s_sensor_file);
+        fclose(s_sensor_file);
+        s_sensor_file = NULL;
+    }
 
     esp_err_t dir_ret = sd_logger_ensure_log_dir_locked();
     if (dir_ret != ESP_OK) {
@@ -268,20 +286,60 @@ static esp_err_t sd_logger_prepare_log_path_locked(const struct tm *utc_time)
     }
 
     char path[128];
-    size_t written = strftime(path, sizeof(path), SD_LOGGER_FILENAME_TEMPLATE, utc_time);
+    size_t written = strftime(path, sizeof(path), SD_LOGGER_SENSOR_FILENAME_TEMPLATE, utc_time);
     if (written == 0 || written >= sizeof(path)) {
-        ESP_LOGE(TAG, "Failed to build log path");
+        ESP_LOGE(TAG, "Failed to build sensor log path");
         return ESP_FAIL;
     }
 
-    s_log_file = fopen(path, "a");
-    if (s_log_file == NULL) {
-        ESP_LOGE(TAG, "Failed to open log file %s (errno=%d)", path, errno);
+    s_sensor_file = fopen(path, "a");
+    if (s_sensor_file == NULL) {
+        ESP_LOGE(TAG, "Failed to open sensor log file %s (errno=%d)", path, errno);
         return ESP_FAIL;
     }
 
-    s_open_day_key = day_key;
+    s_sensor_day_key = day_key;
     ESP_LOGI(TAG, "Logging sensor snapshots to %s", path);
+    return ESP_OK;
+}
+
+static esp_err_t sd_logger_prepare_event_file_locked(const struct tm *utc_time)
+{
+    if (utc_time == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    int day_key = sd_logger_compute_day_key(utc_time);
+    if (s_event_file != NULL && day_key == s_event_day_key) {
+        return ESP_OK;
+    }
+
+    if (s_event_file != NULL) {
+        fflush(s_event_file);
+        fclose(s_event_file);
+        s_event_file = NULL;
+    }
+
+    esp_err_t dir_ret = sd_logger_ensure_log_dir_locked();
+    if (dir_ret != ESP_OK) {
+        return dir_ret;
+    }
+
+    char path[128];
+    size_t written = strftime(path, sizeof(path), SD_LOGGER_EVENT_FILENAME_TEMPLATE, utc_time);
+    if (written == 0 || written >= sizeof(path)) {
+        ESP_LOGE(TAG, "Failed to build event log path");
+        return ESP_FAIL;
+    }
+
+    s_event_file = fopen(path, "a");
+    if (s_event_file == NULL) {
+        ESP_LOGE(TAG, "Failed to open event log file %s (errno=%d)", path, errno);
+        return ESP_FAIL;
+    }
+
+    s_event_day_key = day_key;
+    ESP_LOGI(TAG, "Logging device events to %s", path);
     return ESP_OK;
 }
 
@@ -324,9 +382,103 @@ static void sd_logger_add_sensor_payload(cJSON *sensors, const cached_sensor_t *
     cJSON_AddItemToObject(sensors, sensor->sensor_type, sensor_obj);
 }
 
-static esp_err_t sd_logger_write_entry_locked(const sensor_cache_t *cache, time_t timestamp)
+static const char *sd_logger_category_to_string(log_history_category_t category)
 {
-    if (cache == NULL || s_log_file == NULL) {
+    switch (category) {
+        case LOG_HISTORY_CATEGORY_ERROR:
+            return "error";
+        case LOG_HISTORY_CATEGORY_WARNING:
+            return "warn";
+        case LOG_HISTORY_CATEGORY_SENSOR:
+            return "sensor";
+        case LOG_HISTORY_CATEGORY_INFO:
+        default:
+            return "info";
+    }
+}
+
+static void sd_logger_format_timestamp_iso(int64_t timestamp_us, char *buf, size_t buf_len)
+{
+    if (buf == NULL || buf_len == 0) {
+        return;
+    }
+    time_t seconds = timestamp_us > 0 ? (time_t)(timestamp_us / 1000000LL) : time(NULL);
+    struct tm utc_time = {0};
+    if (gmtime_r(&seconds, &utc_time) == NULL) {
+        memset(&utc_time, 0, sizeof(utc_time));
+    }
+    if (strftime(buf, buf_len, "%Y-%m-%dT%H:%M:%SZ", &utc_time) == 0) {
+        strlcpy(buf, "1970-01-01T00:00:00Z", buf_len);
+    }
+}
+
+static esp_err_t sd_logger_flush_log_history_locked(void)
+{
+    if (s_event_file == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    log_history_entry_t *history_buffer = heap_caps_calloc(
+        LOG_HISTORY_STORAGE_DEPTH,
+        sizeof(log_history_entry_t),
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (history_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate log flush buffer");
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t count = log_history_get_entries(LOG_HISTORY_FILTER_ALL,
+                                           LOG_HISTORY_STORAGE_DEPTH,
+                                           history_buffer);
+    if (count == 0) {
+        heap_caps_free(history_buffer);
+        return ESP_OK;
+    }
+
+    size_t lines_written = 0;
+    for (ssize_t idx = (ssize_t)count - 1; idx >= 0; --idx) {
+        const log_history_entry_t *entry = &history_buffer[idx];
+        if (entry->sequence == 0 || entry->sequence <= s_last_persisted_sequence) {
+            continue;
+        }
+
+        cJSON *json = cJSON_CreateObject();
+        if (json == NULL) {
+            continue;
+        }
+
+        char iso_time[32];
+        sd_logger_format_timestamp_iso(entry->timestamp_us, iso_time, sizeof(iso_time));
+        cJSON_AddNumberToObject(json, "sequence", entry->sequence);
+        cJSON_AddStringToObject(json, "level", sd_logger_category_to_string(entry->category));
+        cJSON_AddStringToObject(json, "tag", entry->tag);
+        cJSON_AddStringToObject(json, "message", entry->message);
+        cJSON_AddNumberToObject(json, "timestamp_us", (double)entry->timestamp_us);
+        cJSON_AddStringToObject(json, "timestamp", iso_time);
+
+        char *line = cJSON_PrintUnformatted(json);
+        cJSON_Delete(json);
+        if (line == NULL) {
+            continue;
+        }
+
+        if (fprintf(s_event_file, "%s\n", line) > 0) {
+            lines_written++;
+            s_last_persisted_sequence = entry->sequence;
+        }
+        free(line);
+    }
+
+    if (lines_written > 0) {
+        fflush(s_event_file);
+    }
+    heap_caps_free(history_buffer);
+    return ESP_OK;
+}
+
+static esp_err_t sd_logger_write_sensor_snapshot_locked(const sensor_cache_t *cache, time_t timestamp)
+{
+    if (cache == NULL || s_sensor_file == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -381,9 +533,9 @@ static esp_err_t sd_logger_write_entry_locked(const sensor_cache_t *cache, time_
 
     log_history_record_sensor_json(json_line);
 
-    int written = fprintf(s_log_file, "%s\n", json_line);
+    int written = fprintf(s_sensor_file, "%s\n", json_line);
     free(json_line);
-    fflush(s_log_file);
+    fflush(s_sensor_file);
 
     if (written < 0) {
         ESP_LOGE(TAG, "Failed to write log entry (errno=%d)", errno);
@@ -401,8 +553,9 @@ static bool sd_logger_should_retry_mount(void)
 static void sd_logger_process_cycle(void)
 {
     sensor_cache_t cache = {0};
-    if (sensor_manager_get_cached_data(&cache) != ESP_OK || !cache.sensor_count) {
-        return;
+    bool have_cache = false;
+    if (sensor_manager_get_cached_data(&cache) == ESP_OK && cache.sensor_count > 0) {
+        have_cache = true;
     }
 
     bool card_inserted = sd_logger_card_present();
@@ -434,11 +587,21 @@ static void sd_logger_process_cycle(void)
         return;
     }
 
-    esp_err_t prep_ret = sd_logger_prepare_log_path_locked(&utc_time);
-    if (prep_ret == ESP_OK) {
-        esp_err_t write_ret = sd_logger_write_entry_locked(&cache, now);
-        if (write_ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to write SD log entry: %s", esp_err_to_name(write_ret));
+    if (have_cache) {
+        esp_err_t sensor_prep = sd_logger_prepare_sensor_file_locked(&utc_time);
+        if (sensor_prep == ESP_OK) {
+            esp_err_t write_ret = sd_logger_write_sensor_snapshot_locked(&cache, now);
+            if (write_ret != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to write SD sensor entry: %s", esp_err_to_name(write_ret));
+            }
+        }
+    }
+
+    esp_err_t event_prep = sd_logger_prepare_event_file_locked(&utc_time);
+    if (event_prep == ESP_OK) {
+        esp_err_t flush_ret = sd_logger_flush_log_history_locked();
+        if (flush_ret != ESP_OK && flush_ret != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "Failed to flush log history: %s", esp_err_to_name(flush_ret));
         }
     }
 

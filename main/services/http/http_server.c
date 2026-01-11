@@ -16,6 +16,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "provisioning/provisioning_runner.h"
 #include "services/time_sync/time_sync.h"
 #include "services/logging/log_history.h"
+#include "storage/sd_logger.h"
 #include "services/keys/api_key_manager.h"
 #include "web_file_editor.h"
 #include "services/telemetry/mqtt_telemetry.h"
@@ -37,6 +38,7 @@ static const char *TAG = "HTTP_SERVER";
 #include "nvs_flash.h"
 #include "nvs.h"
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -62,6 +64,7 @@ static void http_server_free_tls_assets(void)
     }
 }
 
+
 #define OTA_UPLOAD_BUFFER_SIZE 4096
 #define LOG_API_MAX_ENTRIES    200
 
@@ -86,6 +89,11 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache);
 static const char *mqtt_state_to_string(mqtt_state_t state);
 static const char *log_category_to_string(log_history_category_t category);
+static esp_err_t api_logs_handler_live(httpd_req_t *req);
+#if CONFIG_KC_SD_LOGGER_ENABLED
+static bool api_logs_build_sd_path(const char *date_str, char *path, size_t path_len);
+static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str);
+#endif
 static esp_err_t api_logs_handler(httpd_req_t *req);
 
 static cJSON *create_sensors_object_from_cache(const sensor_cache_t *cache)
@@ -151,6 +159,166 @@ static const char *mqtt_state_to_string(mqtt_state_t state)
             return "unknown";
     }
 }
+
+static esp_err_t api_logs_handler_live(httpd_req_t *req)
+{
+    const size_t buffer_size = LOG_API_MAX_ENTRIES * sizeof(log_history_entry_t);
+    log_history_entry_t *entries = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (entries == NULL) {
+        entries = malloc(buffer_size);
+    }
+    if (entries == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+    memset(entries, 0, buffer_size);
+
+    size_t count = log_history_get_entries(LOG_HISTORY_FILTER_ALL, LOG_API_MAX_ENTRIES, entries);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *items = cJSON_CreateArray();
+    if (root == NULL || items == NULL) {
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        if (items != NULL) {
+            cJSON_Delete(items);
+        }
+        free(entries);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    const int64_t now_us = esp_timer_get_time();
+    for (size_t i = 0; i < count; ++i) {
+        const log_history_entry_t *entry = &entries[i];
+        cJSON *item = cJSON_CreateObject();
+        if (item == NULL) {
+            continue;
+        }
+        cJSON_AddNumberToObject(item, "sequence", entry->sequence);
+        cJSON_AddStringToObject(item, "level", log_category_to_string(entry->category));
+        cJSON_AddStringToObject(item, "tag", entry->tag);
+        cJSON_AddStringToObject(item, "message", entry->message);
+        cJSON_AddNumberToObject(item, "timestamp_us", (double)entry->timestamp_us);
+        double age_sec = (double)(now_us - entry->timestamp_us) / 1000000.0;
+        if (age_sec < 0) {
+            age_sec = 0;
+        }
+        cJSON_AddNumberToObject(item, "age_sec", age_sec);
+        cJSON_AddItemToArray(items, item);
+    }
+
+    cJSON_AddItemToObject(root, "entries", items);
+    cJSON_AddNumberToObject(root, "count", count);
+    cJSON_AddStringToObject(root, "source", "live");
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (json == NULL) {
+        free(entries);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    free(entries);
+    return ESP_OK;
+}
+
+#if CONFIG_KC_SD_LOGGER_ENABLED
+static bool api_logs_build_sd_path(const char *date_str, char *path, size_t path_len)
+{
+    if (date_str == NULL || path == NULL || path_len == 0) {
+        return false;
+    }
+    int year = 0, month = 0, day = 0;
+    if (sscanf(date_str, "%4d-%2d-%2d", &year, &month, &day) != 3) {
+        return false;
+    }
+    if (year < 2000 || month < 1 || month > 12 || day < 1 || day > 31) {
+        return false;
+    }
+    int written = snprintf(path,
+                           path_len,
+                           SD_LOGGER_LOG_DIR "/%04d%02d%02d.log",
+                           year,
+                           month,
+                           day);
+    return written > 0 && written < (int)path_len;
+}
+
+static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str)
+{
+    char path[128];
+    if (!api_logs_build_sd_path(date_str, path, sizeof(path))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid date");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Log file not found");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *items = cJSON_CreateArray();
+    if (root == NULL || items == NULL) {
+        fclose(file);
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        if (items != NULL) {
+            cJSON_Delete(items);
+        }
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    char line[768];
+    size_t count = 0;
+    while (fgets(line, sizeof(line), file) != NULL) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+            line[--len] = '\0';
+        }
+        if (len == 0) {
+            continue;
+        }
+        cJSON *item = cJSON_Parse(line);
+        if (item == NULL) {
+            continue;
+        }
+        if (count >= LOG_API_MAX_ENTRIES) {
+            cJSON_DeleteItemFromArray(items, 0);
+            count--;
+        }
+        cJSON_AddItemToArray(items, item);
+        count++;
+    }
+    fclose(file);
+
+    cJSON_AddItemToObject(root, "entries", items);
+    cJSON_AddNumberToObject(root, "count", count);
+    cJSON_AddStringToObject(root, "source", "sd");
+    cJSON_AddStringToObject(root, "date", date_str);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (json == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ESP_OK;
+}
+#endif
 
 static const char *log_category_to_string(log_history_category_t category)
 {
@@ -382,69 +550,33 @@ static esp_err_t api_status_handler(httpd_req_t *req)
 
 static esp_err_t api_logs_handler(httpd_req_t *req)
 {
-    const size_t buffer_size = LOG_API_MAX_ENTRIES * sizeof(log_history_entry_t);
-    log_history_entry_t *entries = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (entries == NULL) {
-        entries = malloc(buffer_size);
-    }
-    if (entries == NULL) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-        return ESP_ERR_NO_MEM;
-    }
-    memset(entries, 0, buffer_size);
+    char query[96] = {0};
+    char source_param[16] = {0};
+    char date_param[16] = {0};
 
-    size_t count = log_history_get_entries(LOG_HISTORY_FILTER_ALL, LOG_API_MAX_ENTRIES, entries);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON *items = cJSON_CreateArray();
-    if (root == NULL || items == NULL) {
-        if (root != NULL) {
-            cJSON_Delete(root);
+    int query_len = httpd_req_get_url_query_len(req);
+    if (query_len > 0 && query_len < (int)sizeof(query)) {
+        if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+            httpd_query_key_value(query, "source", source_param, sizeof(source_param));
+            httpd_query_key_value(query, "date", date_param, sizeof(date_param));
         }
-        if (items != NULL) {
-            cJSON_Delete(items);
-        }
-        free(entries);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-        return ESP_ERR_NO_MEM;
     }
 
-    const int64_t now_us = esp_timer_get_time();
-    for (size_t i = 0; i < count; ++i) {
-        const log_history_entry_t *entry = &entries[i];
-        cJSON *item = cJSON_CreateObject();
-        if (item == NULL) {
-            continue;
+    const bool use_sd_source = strcasecmp(source_param, "sd") == 0;
+    if (use_sd_source) {
+#if CONFIG_KC_SD_LOGGER_ENABLED
+        if (date_param[0] == '\0') {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing date");
+            return ESP_ERR_INVALID_ARG;
         }
-        cJSON_AddNumberToObject(item, "sequence", entry->sequence);
-        cJSON_AddStringToObject(item, "level", log_category_to_string(entry->category));
-        cJSON_AddStringToObject(item, "tag", entry->tag);
-        cJSON_AddStringToObject(item, "message", entry->message);
-        cJSON_AddNumberToObject(item, "timestamp_us", (double)entry->timestamp_us);
-        double age_sec = (double)(now_us - entry->timestamp_us) / 1000000.0;
-        if (age_sec < 0) {
-            age_sec = 0;
-        }
-        cJSON_AddNumberToObject(item, "age_sec", age_sec);
-        cJSON_AddItemToArray(items, item);
+        return api_logs_handler_sd(req, date_param);
+#else
+        httpd_resp_send_err(req, HTTPD_501_NOT_IMPLEMENTED, "SD logging disabled");
+        return ESP_ERR_NOT_SUPPORTED;
+#endif
     }
 
-    cJSON_AddItemToObject(root, "entries", items);
-    cJSON_AddNumberToObject(root, "count", count);
-
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    if (json == NULL) {
-        free(entries);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-        return ESP_ERR_NO_MEM;
-    }
-
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
-    free(json);
-    free(entries);
-    return ESP_OK;
+    return api_logs_handler_live(req);
 }
 
 static esp_err_t api_mqtt_status_handler(httpd_req_t *req)

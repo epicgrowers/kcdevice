@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "kc_device",
-    "project_version":    "01b2fdf-dirty",
+    "project_version":    "9119764-dirty",
     "project_path":       "C:/Code/kc",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5.1-2",
     "build_dir":          "C:/Code/kc/build_s3",
