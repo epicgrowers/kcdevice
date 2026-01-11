@@ -11,11 +11,56 @@ let focusSensorTimer=null;
 let focusPauseIssued=false;
 let currentTab=0;
 const LOG_TAB_INDEX=5;
-const LOG_FILTERS=['ALL','ERROR','WARNING','SENSOR'];
 const LOG_POLL_INTERVAL_MS=5000;
-let logEntries=[];
-let logFilter='ALL';
+const LOG_MAX_BUFFER=2000;
+const LOG_COLOR_MAP={
+  EZO_SENSOR:'#48d597',
+  SENSOR_MGR:'#5fe3c2',
+  MQTT_TELEM:'#7bb7ff',
+  MQTT_CONN:'#4f8bff',
+  PROV_RUN:'#f4c361',
+  WIFI_MGR:'#f28f5c',
+  BOOT_HANDLERS:'#f1556c',
+  SECURITY:'#d78bff',
+  NETWORK_BOOT:'#ffaaae',
+  DEFAULT:'#c5c7ca'
+};
+const LOG_DEFAULT_GROUPS=[
+  {key:'ALL',label:'All',matchers:[]},
+  {key:'MQTT',label:'MQTT',matchers:['MQTT_']},
+  {key:'SENSORS',label:'Sensors',matchers:['EZO_SENSOR','SENSOR_']},
+  {key:'WIFI',label:'WiFi/Provisioning',matchers:['WIFI','PROV_']},
+  {key:'SECURITY',label:'Security',matchers:['SECURITY']},
+  {key:'BOOT',label:'Boot/Network',matchers:['BOOT','NETWORK_']},
+  {key:'OTHER',label:'Other',matchers:[]}
+];
+const LOG_INLINE_ACTIONS=[
+  {matchers:['WIFI','PROV_'],label:'Open Wi-Fi Controls',handler:()=>showTab(3)},
+  {matchers:['MQTT_'],label:'Test MQTT',handler:()=>testMQTT()},
+  {matchers:['EZO_SENSOR','SENSOR_'],label:'Sensors Tab',handler:()=>showTab(1)}
+];
+let logBuffer=[];
 let logPollingTimer=null;
+let logActiveGroup='ALL';
+let logAutoScroll=true;
+let logTerminalEl=null;
+let logJumpButton=null;
+let logInitialized=false;
+let logSearchTerm='';
+let logSearchMatches=[];
+let logSearchIndex=-1;
+let customLogGroups=[];
+let pendingCustomGroups=[];
+let logTagVisibility={};
+let logPinnedIds=new Set();
+let logBookmarks=[];
+let logBaselineTimestamp=null;
+let logTimeWindow=null;
+let logAlertRules=[];
+let logSequence=0;
+let logIngressHistory=[];
+let logContextDrawer=null;
+let logLastRenderedIds=new Set();
 const SENSOR_WS_PATH='/ws/sensors';
 let sensorSocket=null;
 let sensorSocketReady=false;
@@ -219,7 +264,7 @@ async function saveSettings(){try{const mqttInterval=parseInt(document.getElemen
 async function resetSettings(){try{if(!confirm('Reset both intervals to 10 seconds (default)?'))return;const res=await fetch('/api/settings/reset',{method:'POST'});if(!res.ok)throw new Error('Failed to reset settings');const data=await res.json();document.getElementById('mqtt-interval').value=data.mqtt_interval;document.getElementById('sensor-interval').value=data.sensor_interval;alert('Settings reset to defaults (10 seconds)!');}catch(e){alert('Failed to reset settings: '+e.message);}}
 let isLoadingStatus=false;
 async function safeLoadStatus(){if(isLoadingStatus||(focusModeActive&&!focusUsingWebSocket))return;isLoadingStatus=true;try{await loadStatus();}catch(e){console.error('Status load failed:',e);}finally{isLoadingStatus=false;}}
-async function initializeDashboard(){loadTheme();await ensureSensorsResumed();await safeLoadStatus();initSensorSocket();const modal=document.getElementById('sensorModal');if(modal){modal.addEventListener('click',e=>{if(e.target===modal){closeSensorModal();}});}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSensorModal();});setLogFilter(logFilter);setInterval(safeLoadStatus,10000);}
+async function initializeDashboard(){loadTheme();await ensureSensorsResumed();await safeLoadStatus();initSensorSocket();const modal=document.getElementById('sensorModal');if(modal){modal.addEventListener('click',e=>{if(e.target===modal){closeSensorModal();}});}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSensorModal();});ensureLogConsoleReady();setInterval(safeLoadStatus,10000);}
 async function ensureSensorsResumed(){try{await fetch('/api/sensors/resume',{method:'POST'});}catch(e){console.warn('Resume on init failed:',e);}}
 
 // Code Editor Functions
@@ -798,28 +843,151 @@ async function updateEcOutputParams(address){const ec=document.getElementById(`p
 async function updateHumOutputParams(address){const hum=document.getElementById(`param-hum-${address}`)?.checked||false;const t=document.getElementById(`param-t-${address}`)?.checked||false;const dew=document.getElementById(`param-dew-${address}`)?.checked||false;try{const res=await fetch(`/api/sensors/hum-output-params/${address}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hum,t,dew})});if(!res.ok)throw new Error('Failed to update output parameters');alert('✓ HUM output parameters updated');await loadSensors();}catch(e){alert('Failed: '+e.message);}}
 
 // Log Viewer
-function normalizeLogLevel(entry){const category=typeof entry?.category==='number'?entry.category:null;if(category===2)return'ERROR';if(category===1)return'WARNING';if(category===3)return'SENSOR';const raw=(entry&&entry.level?String(entry.level):'').trim().toUpperCase();if(raw.startsWith('ERR'))return'ERROR';if(raw.startsWith('WARN'))return'WARNING';if(raw.startsWith('SENSOR'))return'SENSOR';const tag=(entry&&entry.tag?String(entry.tag):'').trim().toUpperCase();if(tag==='SENSOR')return'SENSOR';return'INFO';}
-function setLogFilter(filter){const normalized=(LOG_FILTERS.includes(filter)?filter:'ALL');logFilter=normalized;document.querySelectorAll('[data-log-filter]').forEach(btn=>{const value=btn.getAttribute('data-log-filter');if(value===normalized){btn.classList.add('log-filter-active');}else{btn.classList.remove('log-filter-active');}});renderLogEntries();}
+function initializeLogConsole(){if(logInitialized)return;logTerminalEl=document.getElementById('logTerminal');logJumpButton=document.getElementById('logJumpToLatest');logContextDrawer=document.getElementById('logContextDrawer');if(!logTerminalEl)return;loadCustomLogGroups();loadLogAlertRules();buildLogGroupFilters();renderLogLegend();renderLogBookmarks();renderLogStats();attachLogEventHandlers();const autoToggle=document.getElementById('logAutoScrollToggle');if(autoToggle)autoToggle.checked=logAutoScroll;logInitialized=true;}
 
-async function loadLogs(manual=false){const status=document.getElementById('logStatus');if(status&&manual){status.textContent='Refreshing...';}try{const res=await fetch('/api/logs',{signal:AbortSignal.timeout(5000)});if(!res.ok)throw new Error('Failed to load logs');const data=await res.json();logEntries=Array.isArray(data.entries)?data.entries:[];renderLogEntries();if(status){status.textContent=`Updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}if(manual){const list=document.getElementById('logList');if(list){list.innerHTML=`<div class='text-red-500 dark:text-red-400'>${escapeHtml(err.message||'Failed to load logs')}</div>`;}}}}
+function ensureLogConsoleReady(){if(!logInitialized){initializeLogConsole();}}
+
+function attachLogEventHandlers(){if(!logTerminalEl)return;logTerminalEl.addEventListener('scroll',handleLogScrollEvent);logTerminalEl.addEventListener('click',handleLogTerminalClick);logTerminalEl.addEventListener('mouseover',handleLogHover);logTerminalEl.addEventListener('mouseleave',clearCorrelationHighlight);}
+
+function loadCustomLogGroups(){try{const stored=localStorage.getItem('logCustomGroups');customLogGroups=stored?JSON.parse(stored):[];customLogGroups=Array.isArray(customLogGroups)?customLogGroups:[];customLogGroups=customLogGroups.map((group,index)=>({...group,key:group.key||`custom-${index}`}));}catch(e){console.warn('Failed to parse custom groups',e);customLogGroups=[];}}
+
+function loadLogAlertRules(){try{const raw=localStorage.getItem('logAlertRules');logAlertRules=raw?JSON.parse(raw):[];if(!Array.isArray(logAlertRules))logAlertRules=[];}catch(e){console.warn('Failed to parse alert rules',e);logAlertRules=[];}}
+
+function buildLogGroupFilters(){const defaultContainer=document.getElementById('logGroupFilters');const customContainer=document.getElementById('logCustomFilters');if(!defaultContainer||!customContainer)return;const defaultHtml=LOG_DEFAULT_GROUPS.map(group=>`<button class="log-chip ${group.key===logActiveGroup?'active':''}" data-log-group='${group.key}'>${group.label}</button>`).join('');defaultContainer.innerHTML=defaultHtml;const customHtml=customLogGroups.map(group=>`<button class="log-chip ${group.key===logActiveGroup?'active':''}" data-log-group='${group.key}'><i class='fas fa-star mr-1'></i>${group.label}</button>`).join('');customContainer.innerHTML=customHtml||'<span class="text-xs text-gray-500">No custom groups yet.</span>';document.querySelectorAll('[data-log-group]').forEach(btn=>{btn.addEventListener('click',()=>setActiveLogGroup(btn.getAttribute('data-log-group')));});}
+
+function setActiveLogGroup(key){if(!key)return;logActiveGroup=key;document.querySelectorAll('[data-log-group]').forEach(btn=>{const isActive=btn.getAttribute('data-log-group')===key;btn.classList.toggle('active',isActive);});renderLogEntries();}
+
+async function loadLogs(manual=false){ensureLogConsoleReady();const status=document.getElementById('logStatus');if(status&&manual){status.textContent='Refreshing...';}try{const res=await fetch('/api/logs',{signal:AbortSignal.timeout(5000)});if(!res.ok)throw new Error('Failed to load logs');const data=await res.json();const entries=Array.isArray(data.entries)?data.entries:[];ingestLogEntries(entries);if(status){status.textContent=`Updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}showLogToast(`Log fetch failed: ${err.message}`);}}
+
+function ingestLogEntries(entries){if(!entries||entries.length===0)return;let appended=false;entries.forEach(raw=>{const normalized=normalizeLogEntry(raw);if(!normalized)return;logBuffer.push(normalized);logIngressHistory.push(normalized.ts);if(logIngressHistory.length>500){logIngressHistory.shift();}appended=true;evaluateAlertRules(normalized);});if(!appended)return;if(logBuffer.length>LOG_MAX_BUFFER){logBuffer=logBuffer.slice(-LOG_MAX_BUFFER);}renderLogEntries();}
+
+function normalizeLogEntry(raw){if(!raw)return null;const now=Date.now();const ageMs=Number(raw.age_sec)*1000;let ts=raw.timestamp?Date.parse(raw.timestamp):Number(raw.ts);if(!Number.isFinite(ts)&&Number.isFinite(ageMs)){ts=now-ageMs;}if(!Number.isFinite(ts))ts=now;const tag=String(raw.tag||'OTHER').trim().toUpperCase();const level=String(raw.level||'INFO').trim().toUpperCase();const message=typeof raw.message==='string'?raw.message:JSON.stringify(raw.message??'');const severity=detectLogSeverity(level,message);const color=resolveLogColor(tag);const correlationId=extractCorrelationId(raw,message);const group=resolveLogGroup(tag);return{ id:`log-${++logSequence}`, ts, tag, level, message, severity, color, correlationId, groupKey:group.key, groupLabel:group.label, displayTime:new Date(ts).toLocaleTimeString(), raw };}
+
+function detectLogSeverity(level,message){const normalized=(level||'').toUpperCase();if(normalized.startsWith('E'))return'error';if(normalized.startsWith('W'))return'warn';if(normalized.startsWith('D'))return'debug';if(normalized.startsWith('I'))return'info';const firstChar=(message||'').trim().charAt(0).toUpperCase();if(firstChar==='E')return'error';if(firstChar==='W')return'warn';return'info';}
+
+function resolveLogColor(tag){const direct=LOG_COLOR_MAP[tag];if(direct)return direct;const matchKey=Object.keys(LOG_COLOR_MAP).find(key=>key!=='DEFAULT'&&tag.startsWith(key));return matchKey?LOG_COLOR_MAP[matchKey]:LOG_COLOR_MAP.DEFAULT;}
+
+function resolveLogGroup(tag){const custom=customLogGroups.find(group=>group.patterns?.some(pattern=>matchesPattern(tag,pattern)));if(custom)return custom;for(const group of LOG_DEFAULT_GROUPS){if(group.key==='ALL'||group.key==='OTHER')continue;if(group.matchers.some(pattern=>matchesPattern(tag,pattern))){return group;}}return LOG_DEFAULT_GROUPS.find(g=>g.key==='OTHER')||LOG_DEFAULT_GROUPS[0];}
+
+function matchesPattern(tag,pattern){if(!pattern)return false;const trimmed=pattern.trim();if(!trimmed)return false;if(trimmed.startsWith('/')&&trimmed.endsWith('/')){try{return new RegExp(trimmed.slice(1,-1),'i').test(tag);}catch(e){return false;}}return tag.startsWith(trimmed.toUpperCase());}
+
+function extractCorrelationId(raw,message){if(raw&&raw.correlation_id)return String(raw.correlation_id);const text=message||'';const match=text.match(/(?:corr(?:elation)?|trace|cid)[^A-Za-z0-9]?([A-Za-z0-9-]{4,})/i);return match?match[1].toUpperCase():null;}
 
 function startLogPolling(){if(logPollingTimer)return;logPollingTimer=setInterval(()=>{loadLogs();},LOG_POLL_INTERVAL_MS);}
 
 function stopLogPolling(){if(!logPollingTimer)return;clearInterval(logPollingTimer);logPollingTimer=null;}
 
-function renderLogEntries(){const list=document.getElementById('logList');if(!list)return;const activeFilter=logFilter||'ALL';const filtered=logEntries.filter(entry=>{const level=normalizeLogLevel(entry);return activeFilter==='ALL'||level===activeFilter;});if(filtered.length===0){list.innerHTML=`<div class='text-gray-500 dark:text-gray-400 text-sm'>No ${activeFilter==='ALL'?'recent':'matching'} logs yet.</div>`;return;}list.innerHTML=filtered.map(renderLogEntry).join('');}
+function getVisibleLogs(){return logBuffer.filter(entry=>{if(logTagVisibility[entry.tag]===false)return false;if(logTimeWindow){if(logTimeWindow.start&&entry.ts<logTimeWindow.start)return false;if(logTimeWindow.end&&entry.ts>logTimeWindow.end)return false;}if(logActiveGroup==='ALL')return true;const activeCustom=customLogGroups.find(g=>g.key===logActiveGroup);if(activeCustom)return entry.groupKey===logActiveGroup;return entry.groupKey===logActiveGroup||(logActiveGroup==='OTHER'&&entry.groupKey==='OTHER');});}
 
-function renderLogEntry(entry){const level=normalizeLogLevel(entry);const tag=escapeHtml(entry.tag||'LOG');const ageLabel=describeLogAge(entry.age_sec);const message=level==='SENSOR'?formatSensorLog(entry.message):escapeHtml(entry.message||'');const levelClass=level.toLowerCase();return `<div class='log-entry log-entry-${levelClass}'>`+
-`<div class='flex items-center justify-between mb-2'>`+
-`<div class='flex items-center gap-2'><span class='log-level-badge'>${level}</span><span class='text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400'>${tag}</span></div>`+
-`<span class='text-xs text-gray-500 dark:text-gray-400'>${ageLabel}</span>`+
+function renderLogEntries(){const terminal=logTerminalEl||document.getElementById('logTerminal');const emptyState=document.getElementById('logEmptyState');if(!terminal)return;const visible=getVisibleLogs();if(visible.length===0){terminal.innerHTML='';if(emptyState)emptyState.classList.remove('hidden');renderLogLegend();renderLogStats();return;}if(emptyState)emptyState.classList.add('hidden');const fragments=visible.map(renderLogLine).join('');terminal.innerHTML=fragments;logLastRenderedIds=new Set(visible.map(v=>v.id));renderLogLegend();renderLogStats();if(logSearchTerm){recomputeSearchMatches();highlightCurrentSearchMatch();}if(logAutoScroll){requestAnimationFrame(()=>scrollLogToBottom());}}
+
+function renderLogLine(entry){const severityClass=`severity-${entry.severity}`;const baselineClass=logBaselineTimestamp&&entry.ts>=logBaselineTimestamp?' after-baseline':'';const pinnedClass=logPinnedIds.has(entry.id)?' highlighted':'';const corr=entry.correlationId?` data-correlation='${entry.correlationId}'`:'';const severityLabel=entry.severity.toUpperCase();const inlineAction=resolveInlineAction(entry.tag);const actionButton=inlineAction?`<button class='log-line-button' data-inline='${entry.id}' title='${inlineAction.label}'><i class='fas fa-bolt'></i></button>`:'';const bookmarkIcon=logPinnedIds.has(entry.id)?'fas fa-bookmark':'far fa-bookmark';const safeTag=escapeHtml(entry.tag);const safeMessage=escapeHtml(entry.message);const searchText=applySearchHighlight(safeMessage);return `<div class='log-line${baselineClass}${pinnedClass}' data-entry-id='${entry.id}'${corr}>`+
+`<span class='log-timestamp'>[${entry.displayTime}]</span>`+
+`<span class='log-tag' style='background:${entry.color}' title='${safeTag}'>${safeTag}</span>`+
+`<div class='log-message' title='${safeMessage}'>${searchText}</div>`+
+`<div class='log-line-controls'>`+
+`<span class='log-severity ${severityClass}'>${severityLabel}</span>`+
+`<button class='log-line-button' data-copy='${entry.id}' title='Copy line'><i class='fas fa-copy'></i></button>`+
+`<button class='log-line-button' data-bookmark='${entry.id}' title='Pin bookmark'><i class='${bookmarkIcon}'></i></button>`+
+`<button class='log-line-button' data-context='${entry.id}' title='Show context'><i class='fas fa-eye'></i></button>`+actionButton+
 `</div>`+
-`<div class='log-message'>${message}</div>`+
 `</div>`;}
 
-function formatSensorLog(raw){try{const parsed=JSON.parse(raw||'{}');const count=parsed.sensor_count??(parsed.sensors?Object.keys(parsed.sensors).length:0);const battery=parsed.battery??parsed.battery_percentage;const snapshot=parsed.timestamp?`@ ${parsed.timestamp}`:'';const sensorList=parsed.sensors?Object.keys(parsed.sensors).slice(0,3).join(', '):'sensors';const extras=[];if(typeof battery==='number'){extras.push(`${battery.toFixed(1)}% batt`);}if(typeof parsed.rssi==='number'){extras.push(`${parsed.rssi} dBm`);}const meta=extras.length?` • ${extras.join(' | ')}`:'';return escapeHtml(`${count||0} readings ${snapshot} (${sensorList})${meta}`);}catch(e){return escapeHtml(raw||'');}}
+function resolveInlineAction(tag){return LOG_INLINE_ACTIONS.find(action=>action.matchers.some(pattern=>tag.startsWith(pattern)));}
 
-function describeLogAge(ageSec){if(!Number.isFinite(ageSec))return'just now';if(ageSec<1){return`${Math.round(ageSec*1000)} ms ago`;}if(ageSec<60){return`${Math.round(ageSec)} s ago`;}const minutes=ageSec/60;if(minutes<60)return`${Math.round(minutes)} min ago`;const hours=minutes/60;if(hours<24)return`${Math.round(hours)} h ago`;return `${Math.round(hours/24)} d ago`;}
+function handleLogTerminalClick(event){const target=event.target.closest('button');if(!target)return;const entryId=target.getAttribute('data-copy')||target.getAttribute('data-bookmark')||target.getAttribute('data-context')||target.getAttribute('data-inline');if(!entryId)return;if(target.hasAttribute('data-copy')){copyLogLine(entryId);}else if(target.hasAttribute('data-bookmark')){toggleLogBookmark(entryId);}else if(target.hasAttribute('data-context')){openLogContext(entryId);}else if(target.hasAttribute('data-inline')){runInlineAction(entryId);}}
+
+function handleLogHover(event){const line=event.target.closest('.log-line');if(!line||!line.dataset.correlation){clearCorrelationHighlight();return;}const corr=line.dataset.correlation;document.querySelectorAll('.log-line').forEach(el=>{el.classList.toggle('correlation-highlight',el.dataset.correlation===corr);});}
+
+function clearCorrelationHighlight(){document.querySelectorAll('.log-line.correlation-highlight').forEach(el=>el.classList.remove('correlation-highlight'));}
+
+function runInlineAction(entryId){const entry=logBuffer.find(item=>item.id===entryId);if(!entry)return;const action=resolveInlineAction(entry.tag);if(action&&typeof action.handler==='function'){action.handler();}}
+
+async function copyLogLine(entryId){const entry=logBuffer.find(item=>item.id===entryId);if(!entry)return;const text=`[${entry.displayTime}] ${entry.tag} ${entry.message}`;try{await navigator.clipboard.writeText(text);showLogToast('Log line copied');}catch(e){console.warn('Clipboard failed',e);}}
+
+function toggleLogBookmark(entryId){if(logPinnedIds.has(entryId)){logPinnedIds.delete(entryId);logBookmarks=logBookmarks.filter(b=>b.id!==entryId);}else{const entry=logBuffer.find(item=>item.id===entryId);if(!entry)return;logPinnedIds.add(entryId);logBookmarks.unshift({id:entry.id,tag:entry.tag,time:entry.displayTime,message:entry.message.slice(0,120)});logBookmarks=logBookmarks.slice(0,20);}renderLogEntries();renderLogBookmarks();}
+
+function renderLogBookmarks(){const container=document.getElementById('logBookmarks');if(!container)return;if(logBookmarks.length===0){container.innerHTML="<div class='text-xs text-gray-500'>No bookmarks yet.</div>";return;}container.innerHTML=logBookmarks.map(bookmark=>`<div class='log-bookmark-card'><p class='text-xs text-gray-400'>[${bookmark.time}] ${bookmark.tag}</p><p class='text-sm text-white mb-2'>${escapeHtml(bookmark.message)}</p><div class='flex justify-between text-xs text-gray-500'><button onclick='scrollToLog("${bookmark.id}")' class='text-green-400'>Jump</button><button onclick='removeBookmark("${bookmark.id}")' class='text-red-400'>Remove</button></div></div>`).join('');}
+
+function scrollToLog(entryId){const line=document.querySelector(`.log-line[data-entry-id="${entryId}"]`);if(!line)return;line.scrollIntoView({behavior:'smooth',block:'center'});line.classList.add('highlighted');setTimeout(()=>line.classList.remove('highlighted'),2000);}
+
+function removeBookmark(entryId){logPinnedIds.delete(entryId);logBookmarks=logBookmarks.filter(b=>b.id!==entryId);renderLogEntries();renderLogBookmarks();}
+
+function clearLogBookmarks(){logPinnedIds.clear();logBookmarks=[];renderLogEntries();renderLogBookmarks();}
+
+function handleLogScrollEvent(){if(!logTerminalEl)return;const nearBottom=logTerminalEl.scrollTop>=logTerminalEl.scrollHeight-logTerminalEl.clientHeight-40;logAutoScroll=nearBottom;const toggle=document.getElementById('logAutoScrollToggle');if(toggle&&toggle.checked!==logAutoScroll){toggle.checked=logAutoScroll;}if(logJumpButton){logJumpButton.classList.toggle('hidden',logAutoScroll);} }
+
+function toggleLogAutoscroll(state){logAutoScroll=state;const toggle=document.getElementById('logAutoScrollToggle');if(toggle&&toggle.checked!==state){toggle.checked=state;}if(state){scrollLogToBottom();}else if(logJumpButton){logJumpButton.classList.remove('hidden');}}
+
+function scrollLogToBottom(){if(!logTerminalEl)return;logTerminalEl.scrollTop=logTerminalEl.scrollHeight; if(logJumpButton)logJumpButton.classList.add('hidden');}
+
+function jumpToLatestLogs(){toggleLogAutoscroll(true);}
+
+function handleLogSearch(value){logSearchTerm=value||'';recomputeSearchMatches();renderLogEntries();}
+
+function recomputeSearchMatches(){logSearchMatches=[];logSearchIndex=-1;if(!logSearchTerm)return;const pattern=logSearchTerm.startsWith('/')&&logSearchTerm.endsWith('/')?new RegExp(logSearchTerm.slice(1,-1),'gi'):new RegExp(escapeRegExp(logSearchTerm),'gi');getVisibleLogs().forEach(entry=>{if(pattern.test(entry.message)){logSearchMatches.push(entry.id);}pattern.lastIndex=0;});if(logSearchMatches.length){logSearchIndex=0;}}
+
+function highlightCurrentSearchMatch(){if(logSearchMatches.length===0)return;const entryId=logSearchMatches[(logSearchIndex+logSearchMatches.length)%logSearchMatches.length];const line=document.querySelector(`.log-line[data-entry-id="${entryId}"]`);if(line){line.classList.add('highlighted');line.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>line.classList.remove('highlighted'),1500);}}
+
+function jumpLogSearch(direction){if(logSearchMatches.length===0)return;logSearchIndex=(logSearchIndex+direction+logSearchMatches.length)%logSearchMatches.length;highlightCurrentSearchMatch();}
+
+function applySearchHighlight(text){if(!logSearchTerm)return text;if(logSearchTerm.startsWith('/')&&logSearchTerm.endsWith('/')){try{return text.replace(new RegExp(logSearchTerm.slice(1,-1),'gi'),match=>`<span class='log-search-highlight'>${match}</span>`);}catch(e){return text;}}const escaped=escapeRegExp(logSearchTerm);return text.replace(new RegExp(escaped,'gi'),match=>`<span class='log-search-highlight'>${match}</span>`);}
+
+function escapeRegExp(str){return str.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+
+function handleLogTimeRange(value){if(value==='all'){logTimeWindow=null;document.getElementById('logCustomStart').value='';document.getElementById('logCustomEnd').value='';renderLogEntries();return;}const minutes=parseInt(value,10);const end=Date.now();const start=end-minutes*60000;logTimeWindow={start,end};renderLogEntries();}
+
+function applyCustomTimeSlice(){const startInput=document.getElementById('logCustomStart');const endInput=document.getElementById('logCustomEnd');const start=startInput?.value?Date.parse(startInput.value):null;const end=endInput?.value?Date.parse(endInput.value):null;if(!start&&!end){logTimeWindow=null;}else{logTimeWindow={start,end};}const rangeSelect=document.getElementById('logTimeRangeSelect');if(rangeSelect)rangeSelect.value='all';renderLogEntries();}
+
+function renderLogLegend(){const container=document.getElementById('logTagLegend');const summary=document.getElementById('logLegendSummary');if(!container)return;const counts={};logBuffer.forEach(entry=>{counts[entry.tag]=(counts[entry.tag]||0)+1;});const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);if(entries.length===0){container.innerHTML="<div class='text-xs text-gray-500'>Waiting for logs...</div>";if(summary)summary.textContent='';return;}container.innerHTML=entries.map(([tag,count])=>{const color=resolveLogColor(tag);const disabled=logTagVisibility[tag]===false?'opacity-40':'';return `<button class='log-legend-item ${disabled}' onclick='toggleTagVisibility("${tag}")'><div class='flex items-center'><span class='log-legend-swatch' style='background:${color}'></span>${tag}</div><span>${count}</span></button>`;}).join('');if(summary){summary.textContent=`${entries.length} tags`;} }
+
+function toggleTagVisibility(tag){logTagVisibility[tag]=!(logTagVisibility[tag]===false);renderLogEntries();}
+
+function toggleTagLegend(){const legend=document.querySelector('.log-legend-panel');if(!legend)return;legend.classList.toggle('hidden');}
+
+function renderLogStats(){const strip=document.getElementById('logStatsStrip');if(!strip)return;const total=logBuffer.length;const errors=logBuffer.filter(e=>e.severity==='error').length;const lastError=logBuffer.slice().reverse().find(e=>e.severity==='error');const lastErrorAgo=lastError?describeTimeAgo(lastError.ts):'—';const rate=computeLogRate();const connection=logPollingTimer?'Polling':'Paused';strip.innerHTML=`<span>Total: ${total}</span><span>Errors: ${errors}</span><span>Last error: ${lastErrorAgo}</span><span>Rate: ${rate.toFixed(1)} lines/min</span><span>Poll: ${connection}</span>`;}
+
+function describeTimeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<1)return'just now';if(diff<60)return`${diff.toFixed(0)}s ago`;const minutes=diff/60;if(minutes<60)return`${minutes.toFixed(0)}m ago`;const hours=minutes/60;if(hours<24)return`${hours.toFixed(0)}h ago`;return`${(hours/24).toFixed(0)}d ago`;}
+
+function computeLogRate(){const now=Date.now();logIngressHistory=logIngressHistory.filter(ts=>now-ts<=600000);return logIngressHistory.length/Math.max((logIngressHistory.length? (now-logIngressHistory[0]):60000)/60000,1);
+}
+
+function downloadVisibleLogs(){const logs=getVisibleLogs();if(logs.length===0){showLogToast('No logs to download');return;}const payload=logs.map(e=>`[${e.displayTime}] ${e.tag} ${e.message}`).join('\n');const blob=new Blob([payload],{type:'text/plain'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='kannacloud-logs.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+async function copyLogShareLink(){const state={group:logActiveGroup,search:logSearchTerm,time:logTimeWindow,hiddenTags:Object.keys(logTagVisibility).filter(tag=>logTagVisibility[tag]===false)};try{const encoded=btoa(JSON.stringify(state));const link=`${window.location.origin}${window.location.pathname}?log=${encoded}`;await navigator.clipboard.writeText(link);showLogToast('Share link copied');}catch(e){console.warn('Share copy failed',e);}}
+
+function setLogBaseline(){if(logBuffer.length===0){showLogToast('No logs yet');return;}logBaselineTimestamp=logBuffer[logBuffer.length-1].ts;showLogToast('Baseline set');renderLogEntries();}
+
+function openLogContext(entryId){const entryIndex=logBuffer.findIndex(e=>e.id===entryId);if(entryIndex<0)return;const context=logBuffer.slice(Math.max(0,entryIndex-10),Math.min(logBuffer.length,entryIndex+11));const body=document.getElementById('logContextBody');const title=document.getElementById('logContextTitle');if(!body||!title)return;title.textContent=`Context around ${logBuffer[entryIndex].tag}`;body.innerHTML=context.map(item=>`<div class='log-context-line ${item.id===entryId?'active':''}'>[${item.displayTime}] ${item.tag} ${escapeHtml(item.message)}</div>`).join('');if(logContextDrawer){logContextDrawer.classList.add('show');logContextDrawer.classList.remove('hidden');}}
+
+function closeLogContext(){if(!logContextDrawer)return;logContextDrawer.classList.remove('show');setTimeout(()=>logContextDrawer.classList.add('hidden'),250);}
+
+function openLogGroupModal(){pendingCustomGroups=JSON.parse(JSON.stringify(customLogGroups||[]));renderLogGroupEditor();document.getElementById('logGroupModal')?.classList.remove('hidden');}
+
+function closeLogGroupModal(){document.getElementById('logGroupModal')?.classList.add('hidden');}
+
+function renderLogGroupEditor(){const editor=document.getElementById('logGroupEditor');if(!editor)return;if(pendingCustomGroups.length===0){pendingCustomGroups.push({key:`custom-${Date.now()}`,label:'New Group',patterns:[]});}
+editor.innerHTML=pendingCustomGroups.map((group,index)=>`<div class='log-group-row'><input type='text' value='${group.label||''}' placeholder='Friendly name' data-group-idx='${index}' data-field='label'><input type='text' value='${(group.patterns||[]).join(', ')}' placeholder='Prefixes or /regex/' data-group-idx='${index}' data-field='patterns'><button type='button' class='log-line-button' data-remove-group='${index}' title='Remove'><i class='fas fa-trash'></i></button></div>`).join('');editor.querySelectorAll('input').forEach(input=>{input.addEventListener('input',e=>{const idx=parseInt(e.target.getAttribute('data-group-idx'),10);const field=e.target.getAttribute('data-field');if(field==='label'){pendingCustomGroups[idx].label=e.target.value;}else if(field==='patterns'){pendingCustomGroups[idx].patterns=e.target.value.split(',').map(v=>v.trim()).filter(Boolean);}});});editor.querySelectorAll('[data-remove-group]').forEach(btn=>btn.addEventListener('click',()=>{const idx=parseInt(btn.getAttribute('data-remove-group'),10);pendingCustomGroups.splice(idx,1);renderLogGroupEditor();}));}
+
+function addCustomLogGroup(){pendingCustomGroups.push({key:`custom-${Date.now()}`,label:'New Group',patterns:[]});renderLogGroupEditor();}
+
+function saveCustomLogGroups(){customLogGroups=pendingCustomGroups.filter(group=>group.label&&group.patterns&&group.patterns.length>0);localStorage.setItem('logCustomGroups',JSON.stringify(customLogGroups));buildLogGroupFilters();renderLogEntries();closeLogGroupModal();}
+
+function openLogAlertModal(){document.getElementById('logAlertModal')?.classList.remove('hidden');renderLogAlertEditor();}
+
+function closeLogAlertModal(){document.getElementById('logAlertModal')?.classList.add('hidden');}
+
+function renderLogAlertEditor(){const editor=document.getElementById('logAlertEditor');if(!editor)return;if(logAlertRules.length===0){logAlertRules.push({id:`alert-${Date.now()}`,label:'WiFi Failures',pattern:'/fail/i'});}editor.innerHTML=logAlertRules.map((rule,index)=>`<div class='log-alert-row'><input type='text' value='${rule.label||''}' placeholder='Label' data-alert-idx='${index}' data-field='label'><input type='text' value='${rule.pattern||''}' placeholder='Pattern' data-alert-idx='${index}' data-field='pattern'><button type='button' class='log-line-button' data-remove-alert='${index}' title='Remove'><i class='fas fa-trash'></i></button></div>`).join('');editor.querySelectorAll('input').forEach(input=>{input.addEventListener('input',e=>{const idx=parseInt(e.target.getAttribute('data-alert-idx'),10);const field=e.target.getAttribute('data-field');logAlertRules[idx][field]=e.target.value;});});editor.querySelectorAll('[data-remove-alert]').forEach(btn=>btn.addEventListener('click',()=>{const idx=parseInt(btn.getAttribute('data-remove-alert'),10);logAlertRules.splice(idx,1);renderLogAlertEditor();}));}
+
+function addLogAlertRule(){logAlertRules.push({id:`alert-${Date.now()}`,label:'New Rule',pattern:''});renderLogAlertEditor();}
+
+function saveLogAlertRules(){logAlertRules=logAlertRules.filter(rule=>rule.pattern);localStorage.setItem('logAlertRules',JSON.stringify(logAlertRules));closeLogAlertModal();}
+
+function evaluateAlertRules(entry){if(!Array.isArray(logAlertRules))return;logAlertRules.forEach(rule=>{if(!rule.pattern)return;const matches=rule.pattern.startsWith('/')&&rule.pattern.endsWith('/')?new RegExp(rule.pattern.slice(1,-1),'i').test(entry.message):entry.message.toLowerCase().includes(rule.pattern.toLowerCase());if(matches){triggerLogAlert(rule,entry);}});}
+
+function triggerLogAlert(rule,entry){const container=document.getElementById('logAlertsContainer');if(!container)return;const toast=document.createElement('div');toast.className='log-alert-toast';toast.textContent=`${rule.label||'Alert'} • ${entry.tag}: ${entry.message}`;container.appendChild(toast);setTimeout(()=>toast.remove(),4000);const line=document.querySelector(`.log-line[data-entry-id="${entry.id}"]`);if(line){line.classList.add('alert-hit');setTimeout(()=>line.classList.remove('alert-hit'),1500);}}
+
+function showLogToast(message){const container=document.getElementById('logAlertsContainer');if(!container)return;const toast=document.createElement('div');toast.className='log-alert-toast';toast.textContent=message;container.appendChild(toast);setTimeout(()=>toast.remove(),3000);}
 
 function escapeHtml(value){return (value??'').toString().replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[char]||char));}
 

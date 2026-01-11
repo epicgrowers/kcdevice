@@ -276,25 +276,141 @@ class='px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold
 </div>
 
 <div class='tab-content' id='tab-5' style='display:none'>
-<h2 class='text-xl font-bold text-gray-900 dark:text-white mb-4'>📝 Device Logs</h2>
-<p class='text-sm text-gray-500 dark:text-gray-400 mb-4'>Inspect recent system messages and mirrored SD sensor entries directly from the device.</p>
-<div class='flex flex-wrap items-center justify-between gap-3 mb-4'>
-  <div class='flex flex-wrap gap-2'>
-    <button class='log-filter-button log-filter-active' data-log-filter='ALL' onclick='setLogFilter("ALL")'>All</button>
-    <button class='log-filter-button' data-log-filter='SENSOR' onclick='setLogFilter("SENSOR")'>Sensor Data</button>
-    <button class='log-filter-button' data-log-filter='WARNING' onclick='setLogFilter("WARNING")'>Warnings</button>
-    <button class='log-filter-button' data-log-filter='ERROR' onclick='setLogFilter("ERROR")'>Errors</button>
+  <div class='log-panel card-animate'>
+    <div class='log-panel-header'>
+      <div>
+        <h2 class='text-xl font-bold text-white'>📝 Device Log Console</h2>
+        <p class='text-sm text-gray-400'>Live terminal-style stream with filters, search, bookmarks, and sharing.</p>
+      </div>
+      <div class='flex gap-2 flex-wrap'>
+        <button onclick='loadLogs(true)' class='log-icon-button' title='Refresh now'>
+          <i class='fas fa-rotate'></i>
+        </button>
+        <button onclick='setLogBaseline()' class='log-icon-button' title='Set session baseline'>
+          <i class='fas fa-flag'></i>
+        </button>
+        <button onclick='downloadVisibleLogs()' class='log-icon-button' title='Download visible buffer'>
+          <i class='fas fa-download'></i>
+        </button>
+        <button onclick='copyLogShareLink()' class='log-icon-button' title='Copy share link'>
+          <i class='fas fa-link'></i>
+        </button>
+      </div>
+    </div>
+
+    <div class='log-toolbar'>
+      <div>
+        <div id='logGroupFilters' class='log-chip-row'></div>
+        <div id='logCustomFilters' class='log-chip-row log-chip-row-muted'></div>
+      </div>
+      <div class='log-toolbar-actions'>
+        <div class='log-search-box'>
+          <i class='fas fa-magnifying-glass'></i>
+          <input id='logSearchInput' type='text' placeholder='Search (supports regex /expr/)' oninput='handleLogSearch(this.value)'>
+          <button onclick='jumpLogSearch(-1)' title='Previous match'><i class='fas fa-chevron-up'></i></button>
+          <button onclick='jumpLogSearch(1)' title='Next match'><i class='fas fa-chevron-down'></i></button>
+        </div>
+        <div class='log-toggle'>
+          <label class='switch'>
+            <input type='checkbox' id='logAutoScrollToggle' checked onchange='toggleLogAutoscroll(this.checked)'>
+            <span class='slider'></span>
+          </label>
+          <span class='text-xs text-gray-400 ml-2'>Auto-scroll</span>
+        </div>
+      </div>
+    </div>
+
+    <div class='log-subtoolbar'>
+      <div class='flex flex-wrap gap-3 items-center'>
+        <label class='text-xs uppercase tracking-wide text-gray-400'>Time Slice</label>
+        <select id='logTimeRangeSelect' class='log-select' onchange='handleLogTimeRange(this.value)'>
+          <option value='all'>All time</option>
+          <option value='5'>Last 5 min</option>
+          <option value='15'>Last 15 min</option>
+          <option value='60'>Last 60 min</option>
+        </select>
+        <input type='datetime-local' id='logCustomStart' class='log-datetime' onchange='applyCustomTimeSlice()'>
+        <span class='text-xs text-gray-500'>to</span>
+        <input type='datetime-local' id='logCustomEnd' class='log-datetime' onchange='applyCustomTimeSlice()'>
+      </div>
+      <div class='flex flex-wrap gap-2'>
+        <button class='log-pill-button' onclick='openLogGroupModal()'><i class='fas fa-layer-group mr-2'></i>Custom Groups</button>
+        <button class='log-pill-button' onclick='openLogAlertModal()'><i class='fas fa-bell mr-2'></i>Alerts</button>
+        <button class='log-pill-button' onclick='toggleTagLegend()'><i class='fas fa-list mr-2'></i>Legend</button>
+      </div>
+    </div>
+
+    <div class='log-terminal-wrapper'>
+      <div id='logEmptyState' class='log-empty-state'>Waiting for device logs…</div>
+      <div id='logTerminal' class='log-terminal' aria-live='polite'></div>
+      <button id='logJumpToLatest' class='log-jump hidden' onclick='jumpToLatestLogs()'>Jump to latest</button>
+    </div>
+
+    <div class='log-aux-panels'>
+      <div class='log-legend-panel'>
+        <div class='log-panel-heading'>
+          <h3 class='text-sm font-semibold text-white'>Tag Legend</h3>
+          <span id='logLegendSummary' class='text-xs text-gray-400'></span>
+        </div>
+        <div id='logTagLegend' class='log-tag-legend'></div>
+      </div>
+      <div class='log-bookmark-panel'>
+        <div class='log-panel-heading'>
+          <h3 class='text-sm font-semibold text-white'>Pinned Bookmarks</h3>
+          <button class='text-xs text-gray-400 hover:text-white' onclick='clearLogBookmarks()'>Clear All</button>
+        </div>
+        <div id='logBookmarks' class='log-bookmark-list'>
+          <div class='text-xs text-gray-500'>No bookmarks yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id='logStatsStrip' class='log-stats-strip'></div>
+    <div id='logStatus' class='log-status-hint text-xs text-gray-400 mt-2'>Never updated</div>
   </div>
-  <div class='flex items-center gap-3'>
-    <button onclick='loadLogs(true)' class='bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 px-4 py-2 rounded-md text-sm font-medium'>
-      <i class='fas fa-rotate'></i> Refresh
-    </button>
-    <span id='logStatus' class='text-xs text-gray-500 dark:text-gray-400'>Never updated</span>
+
+  <div id='logAlertsContainer'></div>
+
+  <div id='logContextDrawer' class='log-context hidden'>
+    <div class='log-context-header'>
+      <div>
+        <p class='text-xs text-gray-400 uppercase tracking-wide'>Context Window</p>
+        <h3 id='logContextTitle' class='text-lg font-semibold text-white'>Selected Log</h3>
+      </div>
+      <button class='log-icon-button' onclick='closeLogContext()'><i class='fas fa-times'></i></button>
+    </div>
+    <div id='logContextBody' class='log-context-body'></div>
   </div>
-</div>
-<div id='logList' class='space-y-3'>
-  <div class='text-gray-500 dark:text-gray-400 text-sm'>Logs will appear once the device begins reporting.</div>
-</div>
+
+  <div id='logGroupModal' class='log-modal hidden'>
+    <div class='log-modal-card'>
+      <div class='flex items-center justify-between mb-4'>
+        <h3 class='text-lg font-semibold text-white'>Custom Log Groups</h3>
+        <button class='log-icon-button' onclick='closeLogGroupModal()'><i class='fas fa-times'></i></button>
+      </div>
+      <p class='text-sm text-gray-400 mb-4'>Create friendly names for tag prefixes or regex patterns (prefix entries with /regex/).</p>
+      <div id='logGroupEditor' class='space-y-3'></div>
+      <button class='log-pill-button w-full justify-center mt-4' onclick='addCustomLogGroup()'>
+        <i class='fas fa-plus mr-2'></i>Add Group
+      </button>
+      <button class='log-primary-button w-full mt-3' onclick='saveCustomLogGroups()'>Save Changes</button>
+    </div>
+  </div>
+
+  <div id='logAlertModal' class='log-modal hidden'>
+    <div class='log-modal-card'>
+      <div class='flex items-center justify-between mb-4'>
+        <h3 class='text-lg font-semibold text-white'>Alert Rules</h3>
+        <button class='log-icon-button' onclick='closeLogAlertModal()'><i class='fas fa-times'></i></button>
+      </div>
+      <p class='text-sm text-gray-400 mb-4'>Add lightweight rules to trigger a toast whenever a matching log arrives.</p>
+      <div id='logAlertEditor' class='space-y-3'></div>
+      <button class='log-pill-button w-full justify-center mt-4' onclick='addLogAlertRule()'>
+        <i class='fas fa-plus mr-2'></i>Add Rule
+      </button>
+      <button class='log-primary-button w-full mt-3' onclick='saveLogAlertRules()'>Save Alerts</button>
+    </div>
+  </div>
 </div>
 
 <!-- Sensor Detail Modal -->
