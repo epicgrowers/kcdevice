@@ -1,3 +1,63 @@
+function ingestLogEntries(entries,options={}){
+  const{reset=false,trackRate=true,prepend=false}=options;
+  if(reset){
+    logBuffer=[];
+    logIngressHistory=[];
+    logPinnedIds.clear();
+    logBookmarks=[];
+    logBaselineTimestamp=null;
+    logLastRenderedIds=new Set();
+    logSeenSequences.clear();
+    logSequenceQueue=[];
+    renderLogBookmarks();
+  }
+  if(!entries||entries.length===0){
+    if(reset){renderLogEntries();}
+    return 0;
+  }
+
+  const normalizedEntries=[];
+  entries.forEach(raw=>{
+    const normalized=normalizeLogEntry(raw);
+    if(!normalized)return;
+    if(normalized.sequence!=null&&logSeenSequences.has(normalized.sequence)){
+      return;
+    }
+    normalizedEntries.push(normalized);
+    if(normalized.sequence!=null){
+      logSeenSequences.add(normalized.sequence);
+      logSequenceQueue.push(normalized.sequence);
+      if(logSequenceQueue.length>LOG_SEQUENCE_TRACK_LIMIT){
+        const seqToRemove=logSequenceQueue.shift();
+        if(seqToRemove!=null){logSeenSequences.delete(seqToRemove);}
+      }
+    }
+    evaluateAlertRules(normalized);
+  });
+
+  if(normalizedEntries.length===0){
+    return 0;
+  }
+
+  if(prepend){
+    logBuffer=normalizedEntries.concat(logBuffer);
+    if(logBuffer.length>LOG_MAX_BUFFER){
+      logBuffer=logBuffer.slice(0,LOG_MAX_BUFFER);
+    }
+  }else{
+    logBuffer=logBuffer.concat(normalizedEntries);
+    if(logBuffer.length>LOG_MAX_BUFFER){
+      logBuffer=logBuffer.slice(-LOG_MAX_BUFFER);
+    }
+  }
+
+  if(trackRate){
+    normalizedEntries.forEach(entry=>{logIngressHistory.push(entry.ts);});
+  }
+
+  renderLogEntries();
+  return normalizedEntries.length;
+}
 function toggleTheme(){const html=document.documentElement;const body=document.body;const icon=document.querySelector('#themeToggle i');if(body.classList.contains('bg-gray-900')){body.className='bg-gray-50 text-gray-900';html.classList.remove('dark');icon.className='fas fa-sun text-xl';localStorage.setItem('theme','light');}else{body.className='bg-gray-900 text-white';html.classList.add('dark');icon.className='fas fa-moon text-xl';localStorage.setItem('theme','dark');}}
 function loadTheme(){const theme=localStorage.getItem('theme')||'dark';const body=document.body;const html=document.documentElement;const icon=document.querySelector('#themeToggle i');if(theme==='light'){body.className='bg-gray-50 text-gray-900';html.classList.remove('dark');icon.className='fas fa-sun text-xl';}else{body.className='bg-gray-900 text-white';html.classList.add('dark');icon.className='fas fa-moon text-xl';}}
 const sensorConfig={RTD:{icon:'🌡️',label:'Temperature',unit:'°C',color:'text-red-500'},pH:{icon:'⚗️',label:'pH Level',unit:'',color:'text-purple-500'},EC:{icon:'⚡',label:'Conductivity',unit:'µS/cm',color:'text-cyan-500'},HUM:{icon:'💧',label:'Humidity',unit:'%',color:'text-blue-500'},DO:{icon:'🫧',label:'Dissolved Oxygen',unit:'mg/L',color:'text-teal-500'},ORP:{icon:'🔋',label:'ORP',unit:'mV',color:'text-pink-500'}};
@@ -13,6 +73,10 @@ let currentTab=0;
 const LOG_TAB_INDEX=5;
 const LOG_POLL_INTERVAL_MS=5000;
 const LOG_MAX_BUFFER=2000;
+const LOG_PAGE_SIZE=50;
+const LOG_FETCH_TIMEOUT_MS=5000;
+const LOG_FETCH_TIMEOUT_SD_MS=40000;
+const LOG_SEQUENCE_TRACK_LIMIT=LOG_MAX_BUFFER*4;
 const LOG_COLOR_MAP={
   EZO_SENSOR:'#48d597',
   SENSOR_MGR:'#5fe3c2',
@@ -63,6 +127,11 @@ let logContextDrawer=null;
 let logLastRenderedIds=new Set();
 let logSource='live';
 let logArchiveDate='';
+let logPaginationMeta={limit:LOG_PAGE_SIZE,offset:0,total:0,hasMore:false};
+let logNextOffset={live:LOG_PAGE_SIZE,sd:LOG_PAGE_SIZE};
+let logLoadedOlder={live:false,sd:false};
+let logSeenSequences=new Set();
+let logSequenceQueue=[];
 const SENSOR_WS_PATH='/ws/sensors';
 let sensorSocket=null;
 let sensorSocketReady=false;
@@ -846,17 +915,54 @@ async function updateHumOutputParams(address){const hum=document.getElementById(
 
 // Log Viewer
 function normalizeLogArchiveDate(value){if(!value)return'';const match=value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!match)return'';const year=Number(match[1]);const month=Number(match[2]);const day=Number(match[3]);if(year<2000||year>2099||month<1||month>12||day<1||day>31)return'';const utcDate=new Date(Date.UTC(year,month-1,day));if(utcDate.getUTCFullYear()!==year||utcDate.getUTCMonth()+1!==month||utcDate.getUTCDate()!==day)return'';return`${match[1]}-${match[2]}-${match[3]}`;}
-function initializeLogConsole(){if(logInitialized)return;logTerminalEl=document.getElementById('logTerminal');logJumpButton=document.getElementById('logJumpToLatest');logContextDrawer=document.getElementById('logContextDrawer');if(!logTerminalEl)return;loadCustomLogGroups();loadLogAlertRules();buildLogGroupFilters();renderLogLegend();renderLogBookmarks();renderLogStats();attachLogEventHandlers();const autoToggle=document.getElementById('logAutoScrollToggle');if(autoToggle)autoToggle.checked=logAutoScroll;updateLogSourceControls();logInitialized=true;}
+function initializeLogConsole(){
+  if(logInitialized)return;
+  logTerminalEl=document.getElementById('logTerminal');
+  logJumpButton=document.getElementById('logJumpToLatest');
+  logContextDrawer=document.getElementById('logContextDrawer');
+  if(!logTerminalEl)return;
+  loadCustomLogGroups();
+  loadLogAlertRules();
+  buildLogGroupFilters();
+  renderLogLegend();
+  renderLogBookmarks();
+  renderLogStats();
+  attachLogEventHandlers();
+  const autoToggle=document.getElementById('logAutoScrollToggle');
+  if(autoToggle)autoToggle.checked=logAutoScroll;
+  updateLogSourceControls();
+  updateLogPaginationStatus();
+  logInitialized=true;
+}
 
 function ensureLogConsoleReady(){if(!logInitialized){initializeLogConsole();}}
 
-function handleLogSourceChange(value){const next=value==='sd'?'sd':'live';if(logSource===next)return;logSource=next;updateLogSourceControls();if(logSource==='live'){startLogPolling();loadLogs(true);}else{stopLogPolling();if(!logArchiveDate){const status=document.getElementById('logStatus');if(status){status.textContent='Select a date to load archive logs';}}else{loadLogs(true);}}}
+function handleLogSourceChange(value){
+  const next=value==='sd'?'sd':'live';
+  if(logSource===next)return;
+  stopLogPolling();
+  logSource=next;
+  updateLogSourceControls();
+  resetLogPaginationState(true);
+  if(logSource==='live'){
+    loadLogs(true);
+    startLogPolling();
+  }else{
+    if(!logArchiveDate){
+      const status=document.getElementById('logStatus');
+      if(status){status.textContent='Select a date to load archive logs';}
+      updateLogPaginationStatus();
+      return;
+    }
+    loadLogs(true);
+  }
+}
 
-function handleLogArchiveDate(value){const normalized=normalizeLogArchiveDate(value);const dateInput=document.getElementById('logArchiveDate');if(!normalized){if(value){showLogToast('Enter a valid date (YYYY-MM-DD, 2000-2099)');}logArchiveDate='';if(dateInput&&dateInput.value){dateInput.value='';}return;}logArchiveDate=normalized;if(dateInput&&dateInput.value!==normalized){dateInput.value=normalized;}if(logSource==='sd'){loadLogs(true);}}
+function handleLogArchiveDate(value){const normalized=normalizeLogArchiveDate(value);const dateInput=document.getElementById('logArchiveDate');if(!normalized){if(value){showLogToast('Enter a valid date (YYYY-MM-DD, 2000-2099)');}logArchiveDate='';if(dateInput&&dateInput.value){dateInput.value='';}resetLogPaginationState(true);return;}logArchiveDate=normalized;if(dateInput&&dateInput.value!==normalized){dateInput.value=normalized;}if(logSource==='sd'){resetLogPaginationState(true);loadLogs(true);}}
 
-function loadArchiveLogs(){if(logSource!=='sd')return;if(!logArchiveDate){showLogToast('Select a date first');return;}loadLogs(true);}
+function loadArchiveLogs(){if(logSource!=='sd')return;if(!logArchiveDate){showLogToast('Select a date first');return;}resetLogPaginationState(true);loadLogs(true);}
 
-function updateLogSourceControls(){const dateInput=document.getElementById('logArchiveDate');const loadButton=document.getElementById('logArchiveLoad');if(dateInput){if(logSource==='sd'){dateInput.style.display='inline-flex';}else{dateInput.style.display='none';dateInput.value='';logArchiveDate='';}}if(loadButton){loadButton.style.display=logSource==='sd'?'inline-flex':'none';}}
+function updateLogSourceControls(){const dateInput=document.getElementById('logArchiveDate');const loadButton=document.getElementById('logArchiveLoad');if(dateInput){if(logSource==='sd'){dateInput.style.display='inline-flex';}else{dateInput.style.display='none';dateInput.value='';logArchiveDate='';}}if(loadButton){loadButton.style.display=logSource==='sd'?'inline-flex':'none';}updateLogPaginationStatus();}
 
 function attachLogEventHandlers(){if(!logTerminalEl)return;logTerminalEl.addEventListener('scroll',handleLogScrollEvent);logTerminalEl.addEventListener('click',handleLogTerminalClick);logTerminalEl.addEventListener('mouseover',handleLogHover);logTerminalEl.addEventListener('mouseleave',clearCorrelationHighlight);}
 
@@ -868,11 +974,172 @@ function buildLogGroupFilters(){const defaultContainer=document.getElementById('
 
 function setActiveLogGroup(key){if(!key)return;logActiveGroup=key;document.querySelectorAll('[data-log-group]').forEach(btn=>{const isActive=btn.getAttribute('data-log-group')===key;btn.classList.toggle('active',isActive);});renderLogEntries();}
 
-async function loadLogs(manual=false){ensureLogConsoleReady();const status=document.getElementById('logStatus');if(status&&manual){status.textContent=logSource==='sd'?'Loading archive...':'Refreshing...';}const params=new URLSearchParams();if(logSource==='sd'){const normalized=normalizeLogArchiveDate(logArchiveDate);if(!normalized){if(status){status.textContent='Select a valid archive date';}if(manual){showLogToast('Select a valid archive date (YYYY-MM-DD, 2000-2099)');}return;}logArchiveDate=normalized;params.set('source','sd');params.set('date',normalized);}const url=params.toString()?`/api/logs?${params.toString()}`:'/api/logs';try{const res=await fetch(url,{signal:AbortSignal.timeout(5000)});if(!res.ok){const errText=await res.text();throw new Error(errText||'Failed to load logs');}const data=await res.json();const entries=Array.isArray(data.entries)?data.entries:[];ingestLogEntries(entries,{reset:logSource==='sd',trackRate:logSource==='live'});if(status){const label=logSource==='sd'?`Archive ${logArchiveDate}`:'Live log';status.textContent=`${label} updated ${new Date().toLocaleTimeString()}`;}}catch(err){console.error('Failed to load logs:',err);if(status){status.textContent='Unable to load logs';}showLogToast(`Log fetch failed: ${err.message}`);}}
+async function loadLogs(manual=false,options={}){
+  ensureLogConsoleReady();
+  const status=document.getElementById('logStatus');
+  const{offsetOverride=null,appendMode='latest'}=options||{};
+  if(status&&manual&&appendMode!=='older'){
+    status.textContent=logSource==='sd'?'Loading archive...':'Refreshing...';
+  }
+
+  const params=new URLSearchParams();
+  let offset=typeof offsetOverride==='number'&&offsetOverride>0?Math.floor(offsetOverride):0;
+  params.set('limit',String(LOG_PAGE_SIZE));
+
+  if(logSource==='sd'){
+    const normalized=normalizeLogArchiveDate(logArchiveDate);
+    if(!normalized){
+      if(status){status.textContent='Select a valid archive date';}
+      if(manual){showLogToast('Select a valid archive date (YYYY-MM-DD, 2000-2099)');}
+      return;
+    }
+    logArchiveDate=normalized;
+    params.set('source','sd');
+    params.set('date',normalized);
+    if(offset>0){params.set('offset',String(offset));}
+  }else if(offset>0){
+    params.set('offset',String(offset));
+  }
+
+  const url=params.toString()?`/api/logs?${params.toString()}`:'/api/logs';
+  const timeoutMs=logSource==='sd'?LOG_FETCH_TIMEOUT_SD_MS:LOG_FETCH_TIMEOUT_MS;
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),timeoutMs);
+
+  try{
+    const res=await fetch(url,{signal:controller.signal});
+    if(!res.ok){
+      const errText=await res.text();
+      throw new Error(errText||'Failed to load logs');
+    }
+    const data=await res.json();
+    const entries=Array.isArray(data.entries)?data.entries:[];
+    const meta={
+      limit:Number.isFinite(data.limit)?Number(data.limit):LOG_PAGE_SIZE,
+      offset:Number.isFinite(data.offset)?Number(data.offset):offset,
+      total:Number.isFinite(data.total)?Number(data.total):0,
+      count:Number.isFinite(data.count)?Number(data.count):entries.length,
+      hasMore:!!data.has_more
+    };
+
+    const prepend=appendMode==='older';
+    const shouldReset=logSource==='sd'&&appendMode!=='older'&&meta.offset===0;
+    const trackRate=logSource==='live'&&!prepend;
+
+    const appendedCount=ingestLogEntries(entries,{reset:shouldReset,trackRate,prepend});
+
+    if(prepend){
+      logLoadedOlder[logSource]=logLoadedOlder[logSource]||entries.length>0;
+      logNextOffset[logSource]=meta.offset+meta.count;
+    }else if(logLoadedOlder[logSource]&&appendedCount>0){
+      logNextOffset[logSource]+=appendedCount;
+    }
+
+    updateLogPaginationStatus(meta);
+
+    if(status){
+      const label=logSource==='sd'?`Archive ${logArchiveDate||''}`:'Live log';
+      if(prepend){
+        status.textContent=`Loaded older entries (${new Date().toLocaleTimeString()})`;
+      }else{
+        status.textContent=`${label} updated ${new Date().toLocaleTimeString()}`;
+      }
+    }
+  }catch(err){
+    console.error('Failed to load logs:',err);
+    if(status){status.textContent='Unable to load logs';}
+    showLogToast(`Log fetch failed: ${err.message}`);
+    if(logSource==='sd'&&logLoadedOlder[logSource]){
+      logNextOffset[logSource]=Math.max(logNextOffset[logSource]-LOG_PAGE_SIZE,LOG_PAGE_SIZE);
+      logLoadedOlder[logSource]=false;
+      updateLogPaginationStatus();
+    }
+  }
+  finally{
+    clearTimeout(timeoutId);
+  }
+}
+
+async function loadOlderLogs(){
+  ensureLogConsoleReady();
+  if(logSource==='sd'&&!logArchiveDate){
+    showLogToast('Select a date first');
+    return;
+  }
+  const button=document.getElementById('logLoadOlder');
+  if(button)button.disabled=true;
+  try{
+    await loadLogs(true,{offsetOverride:logNextOffset[logSource]||LOG_PAGE_SIZE,appendMode:'older'});
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+
+function restoreLatestLogs(){
+  resetLogPaginationState(true);
+  if(logSource==='sd'&&!logArchiveDate){
+    showLogToast('Select a date first');
+    return;
+  }
+  loadLogs(true);
+  if(logSource==='live'){startLogPolling();}
+}
+
+function resetLogPaginationState(clearBuffer=true){
+  logNextOffset[logSource]=LOG_PAGE_SIZE;
+  logLoadedOlder[logSource]=false;
+  logPaginationMeta={limit:LOG_PAGE_SIZE,offset:0,total:0,hasMore:false};
+  if(clearBuffer){
+    logBuffer=[];
+    logIngressHistory=[];
+    logPinnedIds.clear();
+    logBookmarks=[];
+    logBaselineTimestamp=null;
+    logLastRenderedIds=new Set();
+    logSeenSequences.clear();
+    logSequenceQueue=[];
+    renderLogEntries();
+    renderLogBookmarks();
+  }
+  updateLogPaginationStatus();
+}
+
+function updateLogPaginationStatus(meta){
+  if(meta){
+    logPaginationMeta={
+      limit:Number.isFinite(meta.limit)?meta.limit:LOG_PAGE_SIZE,
+      offset:Number.isFinite(meta.offset)?meta.offset:0,
+      total:Number.isFinite(meta.total)?meta.total:0,
+      hasMore:!!meta.hasMore
+    };
+  }
+  const statusEl=document.getElementById('logPaginationStatus');
+  if(statusEl){
+    const totalLabel=logPaginationMeta.total?logPaginationMeta.total:'—';
+    let text=`Showing ${logBuffer.length} of ${totalLabel} entries`;
+    if(logLoadedOlder[logSource]){
+      text+=' • viewing older pages';
+    }
+    statusEl.textContent=text;
+  }
+
+  const loadOlderBtn=document.getElementById('logLoadOlder');
+  if(loadOlderBtn){
+    const requiresDate=logSource==='sd'&&!logArchiveDate;
+    const total=logPaginationMeta.total;
+    const moreAvailable=requiresDate?false:(total? (logNextOffset[logSource]||LOG_PAGE_SIZE)<total : logPaginationMeta.hasMore);
+    loadOlderBtn.disabled=requiresDate||!moreAvailable;
+  }
+
+  const resetBtn=document.getElementById('logResetView');
+  if(resetBtn){
+    resetBtn.disabled=!logLoadedOlder[logSource];
+  }
+}
 
 function ingestLogEntries(entries,options={}){const{reset=false,trackRate=true}=options;if(reset){logBuffer=[];logIngressHistory=[];logPinnedIds.clear();logBookmarks=[];logBaselineTimestamp=null;logLastRenderedIds=new Set();}if(!entries||entries.length===0){if(reset){renderLogEntries();}return;}let appended=false;entries.forEach(raw=>{const normalized=normalizeLogEntry(raw);if(!normalized)return;logBuffer.push(normalized);if(trackRate){logIngressHistory.push(normalized.ts);if(logIngressHistory.length>500){logIngressHistory.shift();}}appended=true;evaluateAlertRules(normalized);});if(!appended)return;if(logBuffer.length>LOG_MAX_BUFFER){logBuffer=logBuffer.slice(-LOG_MAX_BUFFER);}if(!trackRate){logIngressHistory=[];}renderLogEntries();}
 
-function normalizeLogEntry(raw){if(!raw)return null;const now=Date.now();const ageMs=Number(raw.age_sec)*1000;let ts=raw.timestamp?Date.parse(raw.timestamp):Number(raw.ts);if(!Number.isFinite(ts)&&Number.isFinite(ageMs)){ts=now-ageMs;}if(!Number.isFinite(ts))ts=now;const tag=String(raw.tag||'OTHER').trim().toUpperCase();const level=String(raw.level||'INFO').trim().toUpperCase();const message=typeof raw.message==='string'?raw.message:JSON.stringify(raw.message??'');const severity=detectLogSeverity(level,message);const color=resolveLogColor(tag);const correlationId=extractCorrelationId(raw,message);const group=resolveLogGroup(tag);return{ id:`log-${++logSequence}`, ts, tag, level, message, severity, color, correlationId, groupKey:group.key, groupLabel:group.label, displayTime:new Date(ts).toLocaleTimeString(), raw };}
+function normalizeLogEntry(raw){if(!raw)return null;const now=Date.now();const ageMs=Number(raw.age_sec)*1000;let ts=raw.timestamp?Date.parse(raw.timestamp):Number(raw.ts);if(!Number.isFinite(ts)&&Number.isFinite(ageMs)){ts=now-ageMs;}if(!Number.isFinite(ts))ts=now;const sequenceValue=Number(raw.sequence);const sequence=Number.isFinite(sequenceValue)?sequenceValue:null;const tag=String(raw.tag||'OTHER').trim().toUpperCase();const level=String(raw.level||'INFO').trim().toUpperCase();const message=typeof raw.message==='string'?raw.message:JSON.stringify(raw.message??'');const severity=detectLogSeverity(level,message);const color=resolveLogColor(tag);const correlationId=extractCorrelationId(raw,message);const group=resolveLogGroup(tag);return{ id:`log-${++logSequence}`, ts, tag, level, message, severity, color, correlationId, groupKey:group.key, groupLabel:group.label, displayTime:new Date(ts).toLocaleTimeString(), sequence, raw };}
 
 function detectLogSeverity(level,message){const normalized=(level||'').toUpperCase();if(normalized.startsWith('E'))return'error';if(normalized.startsWith('W'))return'warn';if(normalized.startsWith('D'))return'debug';if(normalized.startsWith('I'))return'info';const firstChar=(message||'').trim().charAt(0).toUpperCase();if(firstChar==='E')return'error';if(firstChar==='W')return'warn';return'info';}
 

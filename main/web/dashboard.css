@@ -377,6 +377,16 @@
   color: #e6e7e9;
 }
 
+.log-pill-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.log-pill-muted {
+  border-style: dashed;
+  color: #94a3b8;
+}
+
 .log-primary-button {
   background: linear-gradient(135deg, #48d597, #2aa87a);
   border: none;
