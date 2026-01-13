@@ -2,7 +2,7 @@
 #include "esp_log.h"
 #include <string.h>
 
-static const char *TAG = "PROV_STATE";
+static const char *TAG = "PROV:STATE";
 
 static provisioning_state_t current_state = PROV_STATE_IDLE;
 static state_change_callback_t state_callback = NULL;

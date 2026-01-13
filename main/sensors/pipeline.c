@@ -10,7 +10,7 @@ typedef struct {
     sensor_pipeline_launch_ctx_t *pipeline_ctx;
 } sensor_pipeline_listener_state_t;
 
-static const char *TAG = "SENSOR_PIPELINE";
+static const char *TAG = "SENSORS:PIPELINE";
 static sensor_pipeline_launch_ctx_t *s_default_ctx = NULL;
 static sensor_pipeline_listener_state_t s_listener_state = {0};
 

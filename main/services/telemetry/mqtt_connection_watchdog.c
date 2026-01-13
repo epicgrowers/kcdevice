@@ -9,7 +9,7 @@
 #define MQTT_WATCHDOG_DEFAULT_STUCK_MS     60000U
 #define MQTT_WATCHDOG_DEFAULT_REPORT_MS    30000U
 
-static const char *TAG = "MQTT_WATCHDOG";
+static const char *TAG = "SERVICES:MQTT:WATCH";
 
 typedef struct {
     uint32_t poll_interval_ms;

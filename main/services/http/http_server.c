@@ -6,7 +6,7 @@
 #include "http_server.h"
 #include "esp_log.h"
 
-static const char *TAG = "HTTP_SERVER";
+static const char *TAG = "SERVICES:HTTP";
 
 #ifndef CONFIG_IDF_TARGET_ESP32C6
 // Full HTTP server implementation for ESP32-S3

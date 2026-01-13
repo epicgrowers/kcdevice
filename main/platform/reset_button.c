@@ -11,7 +11,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 
-static const char *TAG = "RESET_BTN";
+static const char *TAG = "PLATFORM:RESET";
 
 // Event structure for passing to handler task
 typedef struct {

@@ -26,7 +26,7 @@ typedef struct {
     void *listener_ctx;
 } services_state_t;
 
-static const char *TAG = "SERVICES_CORE";
+static const char *TAG = "SERVICES:CORE";
 static services_state_t s_state = {0};
 
 static void services_set_ready_bit(void);

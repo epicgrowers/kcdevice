@@ -12,7 +12,7 @@
 #include "sensors/drivers/ezo_sensor.h"
 #include <string.h>
 
-static const char *TAG = "HTTP_WS";
+static const char *TAG = "SERVICES:HTTP:WS";
 
 #define SENSOR_WS_MAX_CLIENTS  4
 #define FOCUS_SAMPLE_INTERVAL_MS 2000

@@ -41,7 +41,7 @@
 #define MQTT_DEFAULT_CLIENT_BACKOFF_MS    (750U)
 #define MQTT_DEFAULT_IDLE_DELAY_MS        (200U)
 
-static const char *TAG = "MQTT_TELEM";
+static const char *TAG = "SERVICES:MQTT";
 
 static TaskHandle_t s_publish_task_handle = NULL;
 static uint32_t s_publish_interval_sec = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC;

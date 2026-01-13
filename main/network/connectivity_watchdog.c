@@ -9,7 +9,7 @@
 #include "services/core/services.h"
 #include <limits.h>
 
-static const char *TAG = "CONN_WATCH";
+static const char *TAG = "NETWORK:WATCHDOG";
 
 #define CONNECTIVITY_WATCHDOG_STACK   3072
 #define CONNECTIVITY_WATCHDOG_PRIO    4

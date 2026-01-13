@@ -11,7 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-static const char *TAG = "EZO_SENSOR";
+static const char *TAG = "SENSORS:EZO";
 
 static esp_err_t ezo_sensor_receive_response(ezo_sensor_t *sensor, char *response, size_t response_size);
 static esp_err_t ezo_sensor_parse_values(char *response, float values[4], uint8_t *count);

@@ -8,7 +8,7 @@
 #include "driver/i2c_master.h"
 #include <string.h>
 
-static const char *TAG = "I2C_SCAN";
+static const char *TAG = "PLATFORM:I2C";
 
 static i2c_master_bus_handle_t bus_handle = NULL;
 

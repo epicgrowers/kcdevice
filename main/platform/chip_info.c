@@ -9,7 +9,7 @@
 #include "esp_psram.h"
 #include <string.h>
 
-static const char *TAG = "CHIP_INFO";
+static const char *TAG = "PLATFORM:CHIP";
 
 /**
  * @brief Get chip model name as string

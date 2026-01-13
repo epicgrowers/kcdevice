@@ -7,7 +7,7 @@
 #include "provisioning/idf_provisioning.h"
 #include "provisioning/provisioning_state.h"
 
-static const char *TAG = "PROV_RUN";
+static const char *TAG = "PROV:RUNNER";
 
 static const provisioning_wifi_ops_t *s_wifi_ops = NULL;
 

@@ -16,7 +16,7 @@
 #include "wifi_provisioning/manager.h"
 #include "wifi_provisioning/scheme_ble.h"
 
-static const char *TAG = "idf_prov";
+static const char *TAG = "PROV:IDF";
 static const char *kServicePrefix = "kc-";
 static const char *kPop = "sumppop";
 

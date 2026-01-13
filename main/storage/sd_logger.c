@@ -34,7 +34,7 @@
 #define SD_LOGGER_MIN_INTERVAL_SEC         5U
 #define SD_LOGGER_RETRY_INTERVAL_MS        10000
 
-static const char *TAG = "SD_LOGGER";
+static const char *TAG = "STORAGE:SD";
 
 static TaskHandle_t s_logger_task_handle = NULL;
 static SemaphoreHandle_t s_file_mutex = NULL;

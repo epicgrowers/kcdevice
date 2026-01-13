@@ -18,7 +18,7 @@
 #include <time.h>
 #include <string.h>
 
-static const char *TAG = "NETWORK_BOOT";
+static const char *TAG = "NETWORK:BOOT";
 
 static network_boot_config_t s_network_boot_config;
 static bool s_network_task_started = false;

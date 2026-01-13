@@ -14,7 +14,7 @@
 #include "services/keys/api_key_manager.h"
 #include <string.h>
 
-static const char *TAG = "CLOUD_PROV";
+static const char *TAG = "SERVICES:CLOUD_PROV";
 
 // NVS namespace and partition for certificates
 #ifdef CONFIG_IDF_TARGET_ESP32C6

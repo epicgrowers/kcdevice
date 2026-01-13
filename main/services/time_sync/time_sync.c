@@ -9,7 +9,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-static const char *TAG = "TIME_SYNC";
+static const char *TAG = "SERVICES:TIME";
 
 // Default NTP servers
 #define NTP_SERVER_PRIMARY   "pool.ntp.org"

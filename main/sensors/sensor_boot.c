@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *TAG = "SENSOR_BOOT";
+static const char *TAG = "SENSORS:BOOT";
 
 static sensor_boot_config_t s_sensor_boot_config;
 static bool s_sensor_task_started = false;

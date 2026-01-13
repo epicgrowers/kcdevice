@@ -8,7 +8,7 @@
 
 #define MQTT_RETRY_DELAY_MS 5000
 
-static const char *TAG = "MQTT_CONN";
+static const char *TAG = "SERVICES:MQTT:CONN";
 
 static esp_mqtt_client_handle_t s_mqtt_client = NULL;
 static TaskHandle_t s_mqtt_supervisor_task = NULL;

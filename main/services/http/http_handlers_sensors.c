@@ -20,7 +20,7 @@
 #define SENSOR_STATUS_URI      "/api/sensors/status/"
 #define SENSOR_SAMPLE_URI      "/api/sensors/sample/"
 
-static const char *TAG = "HTTP_SENSORS";
+static const char *TAG = "SERVICES:HTTP:SENSORS";
 static SemaphoreHandle_t s_sensor_guard_mutex;
 
 void sensor_read_guard_acquire(sensor_read_guard_t *guard)

@@ -21,24 +21,57 @@
 #include <limits.h>
 #include <stddef.h>
 
-static const char *TAG = "SENSOR_MGR";
+static const char *TAG = "SENSORS:MGR";
 
 // Sensor handles
 static max17048_t s_battery_monitor;
 static bool s_battery_available = false;
 
+/**
+ * Maximum number of EZO sensors supported
+ * Covers: RTD, pH, EC, DO, ORP, Humidity
+ */
 #define MAX_EZO_SENSORS 5
+
 static ezo_sensor_t s_ezo_sensors[MAX_EZO_SENSORS];
 static uint8_t s_ezo_count = 0;
 
-#define SENSOR_TRIGGER_DELAY_MS 20
-#define SENSOR_WAIT_STEP_MS 50
-#define SENSOR_MIN_WAIT_MS 750
-#define SENSOR_CONSECUTIVE_FAIL_LIMIT 5
-#define SENSOR_RECOVERY_RETRY_MS 120000
-#define SENSOR_RECOVERY_RETRY_US (SENSOR_RECOVERY_RETRY_MS * 1000ULL)
-#define SENSOR_RECOVERY_INIT_DELAY_MS 3000
-#define SENSOR_RECOVERY_MAX_ATTEMPTS 5
+/**
+ * EZO Sensor Timing Constants
+ *
+ * EZO sensors require specific timing for I2C communication and conversion:
+ * 1. Send read command
+ * 2. Wait for trigger delay (sensor processes command)
+ * 3. Poll every wait_step until data ready or min_wait expires
+ *
+ * Rationale:
+ * - 20ms trigger: Atlas Scientific EZO spec requires 10-20ms command processing
+ * - 50ms polling: Balance between responsiveness and I2C bus load
+ * - 750ms minimum: Most EZO sensors complete conversion in 600-700ms
+ */
+#define SENSOR_TRIGGER_DELAY_MS 20          // Delay after sending read command to EZO sensor
+#define SENSOR_WAIT_STEP_MS 50              // Polling interval to check if sensor data ready
+#define SENSOR_MIN_WAIT_MS 750              // Minimum wait for sensor conversion (typ 600-700ms)
+
+/**
+ * Sensor Health and Recovery Configuration
+ *
+ * Tracks sensor failures and attempts recovery to handle:
+ * - Loose I2C connections
+ * - Temporary sensor faults
+ * - Environmental interference
+ *
+ * Rationale:
+ * - 5 failures: Enough to identify persistent issues without false positives
+ * - 2 minutes: Allow time for environmental issues to clear
+ * - 3 seconds: Prevent rapid re-init during boot
+ * - 5 attempts: Balance between recovery effort and giving up
+ */
+#define SENSOR_CONSECUTIVE_FAIL_LIMIT 5     // Mark sensor degraded after N consecutive failures
+#define SENSOR_RECOVERY_RETRY_MS 120000     // Wait 2 minutes between recovery attempts
+#define SENSOR_RECOVERY_RETRY_US (SENSOR_RECOVERY_RETRY_MS * 1000ULL)  // Microsecond conversion
+#define SENSOR_RECOVERY_INIT_DELAY_MS 3000  // Wait 3 seconds after boot before first recovery
+#define SENSOR_RECOVERY_MAX_ATTEMPTS 5      // Maximum recovery attempts before permanent degradation
 
 static uint8_t s_consecutive_failures[MAX_EZO_SENSORS] = {0};
 static bool s_sensor_degraded[MAX_EZO_SENSORS] = {0};
@@ -61,7 +94,12 @@ typedef struct {
 } cached_sensor_data_t;
 
 static cached_sensor_data_t s_cached_readings[MAX_EZO_SENSORS] = {0};
-#define CACHE_TIMEOUT_MS 300000  // 5 minutes - consider cached data stale after this
+
+/**
+ * Cache validity timeout (5 minutes)
+ * After this period, cached sensor data is considered stale and marked invalid
+ */
+#define CACHE_TIMEOUT_MS 300000
 
 // Global sensor cache for API access
 static sensor_cache_t s_sensor_cache = {0};
@@ -70,14 +108,23 @@ static SemaphoreHandle_t s_cache_mutex = NULL;
 static sensor_cache_listener_t s_cache_listener = NULL;
 static void *s_cache_listener_ctx = NULL;
 
-// RTD temperature tracking for compensation
-static float s_last_rtd_temp = 25.0f;  // Default fallback temperature
-static int64_t s_last_rtd_timestamp_us = 0;  // Timestamp of last RTD reading
-#define RTD_TEMP_STALE_THRESHOLD_US (30 * 1000000)  // 30 seconds
+/**
+ * RTD (Temperature) Compensation Configuration
+ *
+ * Many EZO sensors (pH, EC, DO) require temperature compensation for accuracy.
+ * We track the last RTD reading and use it for compensation if fresh enough.
+ *
+ * Default: 25.0°C is standard calibration temperature per Atlas Scientific spec
+ * Stale threshold: 30 seconds balances accuracy with tolerance for sensor lag
+ */
+static float s_last_rtd_temp = 25.0f;               // Default fallback temperature (°C)
+static int64_t s_last_rtd_timestamp_us = 0;         // Timestamp of last RTD reading
+#define RTD_TEMP_STALE_THRESHOLD_US (30 * 1000000)  // Consider temp stale after 30 seconds
+#define RTD_DEFAULT_TEMP_C 25.0f                    // Standard calibration temperature
 
 // Background reading task
 static TaskHandle_t s_reading_task_handle = NULL;
-static uint32_t s_reading_interval_sec = 10;
+static uint32_t s_reading_interval_sec = 10;        // Default sensor reading interval
 static bool s_reading_paused = false;
 static bool s_reading_in_progress = false;
 static esp_err_t sensor_manager_refresh_settings_internal(void);

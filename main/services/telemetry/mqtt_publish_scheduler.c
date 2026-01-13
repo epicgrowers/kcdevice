@@ -8,7 +8,7 @@
 #define MQTT_SCHED_DEFAULT_IDLE_MS        200U
 #define MQTT_SCHED_OFFLINE_BACKOFF_MS    1000U
 
-static const char *TAG = "MQTT_SCHED";
+static const char *TAG = "SERVICES:MQTT:SCHED";
 
 static inline int64_t ms_to_us(uint32_t ms)
 {

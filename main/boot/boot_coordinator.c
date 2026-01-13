@@ -2,7 +2,7 @@
 
 #include "esp_log.h"
 
-static const char *TAG = "BOOT_COORD";
+static const char *TAG = "MAIN:BOOT:COORD";
 
 esp_err_t boot_coordinator_init(boot_coordinator_t *coordinator)
 {

@@ -13,7 +13,7 @@
 #include <strings.h>
 #include <time.h>
 
-static const char *TAG = "API_KEY_MGR";
+static const char *TAG = "SERVICES:KEYS";
 
 // NVS namespace for API keys
 #define NVS_NAMESPACE "api_keys"

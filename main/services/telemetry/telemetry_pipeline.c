@@ -5,7 +5,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
-static const char *TAG = "TELEM_PIPE";
+static const char *TAG = "SERVICES:TELEMETRY";
 
 static const sensor_pipeline_launch_ctx_t *resolve_ctx(const telemetry_pipeline_t *pipeline)
 {

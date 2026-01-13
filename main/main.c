@@ -20,7 +20,7 @@
 #include "storage/sd_logger.h"
 #include "services/logging/log_history.h"
 
-static const char *TAG = "MAIN";
+static const char *TAG = "MAIN:APP";
 
 static boot_coordinator_t s_boot_coordinator = {0};
 

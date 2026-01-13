@@ -8,7 +8,7 @@
 #include "esp_efuse_table.h"
 #include <string.h>
 
-static const char *TAG = "SECURITY";
+static const char *TAG = "PLATFORM:SEC";
 
 // Flag to track encryption status
 static bool nvs_encryption_enabled = false;

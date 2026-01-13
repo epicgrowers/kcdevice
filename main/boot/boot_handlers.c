@@ -8,7 +8,7 @@
 #include "provisioning/provisioning_runner.h"
 #include "nvs_flash.h"
 
-static const char *TAG = "BOOT_HANDLERS";
+static const char *TAG = "MAIN:BOOT:HANDLERS";
 
 void boot_provisioning_state_change_handler(provisioning_state_t state,
                                             provisioning_status_code_t status,

@@ -13,7 +13,7 @@
 
 #define LOG_HISTORY_LINE_BUFFER_LEN 384
 
-static const char *TAG = "LOG_HISTORY";
+static const char *TAG = "SERVICES:LOG";
 static SemaphoreHandle_t s_log_mutex;
 static log_history_entry_t *s_entries;
 static size_t s_write_index;

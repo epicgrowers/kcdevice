@@ -6,7 +6,7 @@
 #include "services/discovery/mdns_service.h"
 #include "esp_log.h"
 
-static const char *TAG = "MDNS";
+static const char *TAG = "SERVICES:MDNS";
 
 #ifndef CONFIG_IDF_TARGET_ESP32C6
 // Full mDNS implementation for ESP32-S3

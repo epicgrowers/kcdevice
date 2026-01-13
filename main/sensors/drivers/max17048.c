@@ -8,7 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-static const char *TAG = "MAX17048";
+static const char *TAG = "SENSORS:MAX17048";
 
 /**
  * @brief Write 16-bit register

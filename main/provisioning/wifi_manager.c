@@ -11,15 +11,32 @@
 #include "freertos/timers.h"
 #include <string.h>
 
-static const char *TAG = "WIFI_MGR";
+static const char *TAG = "PROV:WIFI_MGR";
 
 // WiFi event bits
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
-#define WIFI_RETRY_BASE_DELAY_MS 1000U
-#define WIFI_RETRY_MAX_DELAY_MS 60000U
-#define WIFI_RETRY_MAX_EXPONENT 6U
+/**
+ * WiFi Connection Retry Configuration
+ *
+ * Implements exponential backoff: delay = base_delay * 2^attempt
+ * Example progression: 1s, 2s, 4s, 8s, 16s, 32s, 60s (capped)
+ *
+ * Rationale:
+ * - 1s base: Quick retry for transient network issues
+ * - 60s max: Prevents excessive traffic on failed networks
+ * - Exponent 6: Balances between quick recovery and backoff
+ */
+#define WIFI_RETRY_BASE_DELAY_MS 1000U      // Initial retry delay (1 second)
+#define WIFI_RETRY_MAX_DELAY_MS 60000U      // Maximum retry delay (60 seconds)
+#define WIFI_RETRY_MAX_EXPONENT 6U          // Max exponent for backoff (2^6 = 64s, capped to 60s)
+
+/**
+ * Error reporting interval
+ * Report WiFi failure status every N retry attempts to avoid log spam
+ */
+#define WIFI_ERROR_REPORT_INTERVAL 10       // Report failure state every 10 retries
 
 static EventGroupHandle_t s_wifi_event_group;
 static TimerHandle_t s_retry_timer = NULL;
@@ -82,7 +99,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
 
         if (s_retry_num == 1) {
             xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        } else if (s_retry_num % 10 == 0) {
+        } else if (s_retry_num % WIFI_ERROR_REPORT_INTERVAL == 0) {
             provisioning_state_set(PROV_STATE_WIFI_FAILED, status_code, error_msg);
         }
         

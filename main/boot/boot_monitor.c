@@ -4,7 +4,7 @@
 #include "services/telemetry/mqtt_telemetry.h"
 #include <stdio.h>
 
-static const char *TAG = "BOOT_MON";
+static const char *TAG = "MAIN:BOOT:MONITOR";
 
 void boot_monitor_publish(const char *stage, const char *detail)
 {

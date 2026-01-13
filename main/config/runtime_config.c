@@ -58,7 +58,7 @@ typedef struct {
     char timezone[32];
 } runtime_services_overrides_t;
 
-static const char *TAG = "RUNTIME_CFG";
+static const char *TAG = "CONFIG:RUNTIME";
 static runtime_services_overrides_t s_overrides = {0};
 static const runtime_config_digest_t s_runtime_digests = {
     .services_sha256 = RUNTIME_CONFIG_SERVICES_SHA256,

@@ -6,7 +6,7 @@
 #include "web_file_editor.h"
 #include "esp_log.h"
 
-static const char *TAG = "WEB_EDITOR";
+static const char *TAG = "SERVICES:HTTP:EDITOR";
 
 #ifndef CONFIG_IDF_TARGET_ESP32C6
 // Full web file editor implementation for ESP32-S3
