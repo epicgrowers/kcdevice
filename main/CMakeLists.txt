@@ -29,6 +29,8 @@ if(NOT CMAKE_SCRIPT_MODE_FILE)
 endif()
 
 idf_component_register(SRCS "main.c"
+                             "common/error_handler.c"
+                             "common/secure_logging.c"
                              "platform/chip_info.c"
                              "provisioning/idf_provisioning.c"
                              "provisioning/wifi_manager.c"

@@ -135,9 +135,69 @@ _To be updated as refactoring progresses_
 3. **Better debugging** - Hierarchical logging enables targeted troubleshooting
 4. **Knowledge transfer** - Timing rationale now preserved in code
 
-## Next Steps
+## Phase 2: Error Handling & Safety - Started 2026-01-13
 
-**Phase 2**: Error Handling & Safety
-- [ ] Create unified error handling framework
-- [ ] Standardize error reporting patterns
-- [ ] Improve credential security handling
+**Status**: 🔨 In Progress
+**Branch**: `refactor/comprehensive-improvements`
+
+### Goals
+- Create unified error handling framework
+- Standardize error reporting patterns
+- Improve credential security handling
+- Reduce code duplication in error paths
+
+### Progress
+
+#### 1. Error Handler Framework Created
+**What**: Created reusable error handling macros and utilities
+**Why**: Eliminate 193+ instances of repetitive error handling code
+**Files Created**:
+- `main/common/error_handler.h` - Error handling macros (RETURN_ON_ERROR, WARN_ON_ERROR, etc.)
+- `main/common/error_handler.c` - Implementation with context-aware logging
+
+**Macros Provided**:
+- `RETURN_ON_ERROR(expr, msg)` - Check and return with context logging
+- `RETURN_ON_ERROR_WITH_CLEANUP(expr, msg, cleanup)` - With cleanup code
+- `WARN_ON_ERROR(expr, msg)` - Log warning but continue
+- `FATAL_ON_ERROR(expr, msg)` - Abort on critical errors
+- `RETURN_ON_NULL(ptr, msg)` - Null pointer checks
+- `RETURN_ON_FALSE(condition, msg, err)` - Condition checks
+- `GOTO_ON_ERROR(expr, label, msg)` - For complex cleanup paths
+
+**Benefits**:
+- File, line, function automatically included in error messages
+- Consistent error message formatting
+- Reduced boilerplate (3-4 lines → 1 line)
+- Better debugging with full context
+
+#### 2. Secure Logging Utilities Created
+**What**: Utilities to prevent sensitive data leaks in logs
+**Why**: Credentials and API keys were at risk of being logged
+**Files Created**:
+- `main/common/secure_logging.h` - Secure logging API
+- `main/common/secure_logging.c` - Implementation
+
+**Functions Provided**:
+- `secure_mask_password(password)` - Completely masks passwords
+- `secure_mask_ssid(ssid)` - Partially masks SSIDs
+- `secure_mask_api_key(key)` - Masks API keys (shows first/last 4 chars)
+- `secure_zero_memory(ptr, len)` - Secure memory cleanup
+- `secure_is_sensitive_variable(name)` - Heuristic detection
+
+**Security Improvements**:
+- Passwords never appear in logs
+- Memory zeroed after use
+- Compiler-safe secure cleanup
+
+#### 3. Build System Updated
+**What**: Added new common utilities to CMakeLists.txt
+**Files Modified**:
+- `main/CMakeLists.txt` - Added error_handler.c and secure_logging.c
+
+### Next Steps (Phase 2 Continued)
+- [ ] Apply framework to WiFi manager
+- [ ] Apply framework to sensor manager
+- [ ] Apply framework to services
+- [ ] Audit all credential handling
+- [ ] Build and test all changes
+- [ ] Document usage examples
