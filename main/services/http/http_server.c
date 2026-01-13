@@ -67,9 +67,10 @@ static void http_server_free_tls_assets(void)
 
 
 #define OTA_UPLOAD_BUFFER_SIZE 4096
-#define LOG_API_MAX_ENTRIES    200
-#define LOG_API_DEFAULT_LIMIT  50
-#define LOG_API_MIN_LIMIT      1
+#define LOG_API_MAX_ENTRIES     200
+#define LOG_API_DEFAULT_LIMIT   50
+#define LOG_API_MIN_LIMIT       1
+#define LOG_DOWNLOAD_CHUNK_SIZE 2048
 
 // External sensor reading functions from mqtt_telemetry.c
 extern float read_temperature(void);
@@ -96,6 +97,7 @@ static esp_err_t api_logs_handler_live(httpd_req_t *req, int limit, int offset);
 #if CONFIG_KC_SD_LOGGER_ENABLED
 static bool api_logs_build_sd_path(const char *date_str, char *path, size_t path_len);
 static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str, int limit, int offset);
+static esp_err_t api_logs_download_handler(httpd_req_t *req);
 #endif
 static esp_err_t api_logs_handler(httpd_req_t *req);
 
@@ -281,115 +283,111 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str, int
         return ESP_ERR_NOT_FOUND;
     }
 
-    struct stat st = {0};
-    long handle_size = -1;
-    if (fseek(file, 0, SEEK_END) == 0) {
-        long pos = ftell(file);
-        if (pos >= 0) {
-            handle_size = pos;
-        }
-        fseek(file, 0, SEEK_SET);
+    if (limit < LOG_API_MIN_LIMIT) {
+        limit = LOG_API_MIN_LIMIT;
     }
-    if (stat(path, &st) == 0) {
-        ESP_LOGI(TAG,
-                 "SD logs %s opened %s (stat=%ld handle=%ld)",
-                 date_str,
-                 path,
-                 (long)st.st_size,
-                 handle_size);
-    } else {
-        ESP_LOGW(TAG, "Failed to stat %s (errno=%d)", path, errno);
+    if (limit > LOG_API_MAX_ENTRIES) {
+        limit = LOG_API_MAX_ENTRIES;
+    }
+    if (offset < 0) {
+        offset = 0;
     }
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON *items = cJSON_CreateArray();
-    if (root == NULL || items == NULL) {
+    if (fseek(file, 0, SEEK_END) != 0) {
         fclose(file);
-        if (root != NULL) {
-            cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to inspect log file");
+        return ESP_FAIL;
+    }
+    long file_size = ftell(file);
+    if (file_size < 0) {
+        fclose(file);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to inspect log file");
+        return ESP_FAIL;
+    }
+
+    size_t lines_needed = (size_t)offset + (size_t)limit;
+    if (lines_needed == 0) {
+        lines_needed = (size_t)limit;
+    }
+    if (lines_needed == 0) {
+        lines_needed = LOG_API_DEFAULT_LIMIT;
+    }
+
+    long tail_offset = 0;
+    bool has_more = false;
+
+    if (file_size > 0 && lines_needed > 0) {
+        const size_t block_size = 4096;
+        char *block = malloc(block_size);
+        if (block == NULL) {
+            fclose(file);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+            return ESP_ERR_NO_MEM;
         }
-        if (items != NULL) {
-            cJSON_Delete(items);
+
+        long scan_pos = file_size;
+        size_t newline_count = 0;
+        bool offset_found = false;
+
+        while (scan_pos > 0 && newline_count < lines_needed) {
+            size_t chunk = (scan_pos >= (long)block_size) ? block_size : (size_t)scan_pos;
+            scan_pos -= chunk;
+            if (fseek(file, scan_pos, SEEK_SET) != 0) {
+                free(block);
+                fclose(file);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Seek failed");
+                return ESP_FAIL;
+            }
+            size_t read_bytes = fread(block, 1, chunk, file);
+            for (int i = (int)read_bytes - 1; i >= 0; --i) {
+                if (block[i] == '\n') {
+                    newline_count++;
+                    if (newline_count == lines_needed) {
+                        tail_offset = scan_pos + i + 1;
+                        offset_found = true;
+                        break;
+                    }
+                }
+            }
+            if (offset_found) {
+                break;
+            }
         }
+
+        if (!offset_found) {
+            tail_offset = 0;
+        } else if (tail_offset > 0) {
+            has_more = true;
+        }
+
+        free(block);
+    }
+
+    if (fseek(file, tail_offset, SEEK_SET) != 0) {
+        fclose(file);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Seek failed");
+        return ESP_FAIL;
+    }
+
+    size_t window_capacity = (size_t)offset + (size_t)limit;
+    if (window_capacity == 0) {
+        window_capacity = (size_t)limit;
+    }
+    if (window_capacity == 0) {
+        window_capacity = LOG_API_DEFAULT_LIMIT;
+    }
+
+    cJSON **parsed_entries = calloc(window_capacity, sizeof(cJSON *));
+    if (parsed_entries == NULL) {
+        fclose(file);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
         return ESP_ERR_NO_MEM;
     }
 
-    size_t skip_newest = offset >= 0 ? (size_t)offset : 0;
-    size_t window_capacity = skip_newest + (size_t)limit;
-    if (window_capacity == 0) {
-        window_capacity = (size_t)limit;
-    }
-    long *line_positions = NULL;
-    if (window_capacity > 0) {
-        line_positions = malloc(window_capacity * sizeof(long));
-        if (line_positions == NULL) {
-            fclose(file);
-            cJSON_Delete(items);
-            cJSON_Delete(root);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-            return ESP_ERR_NO_MEM;
-        }
-    }
-
     char line[768];
-    size_t total_entries = 0;
-    size_t position_count = 0;
-    size_t position_start = 0;
-
-    while (true) {
-        long line_pos = ftell(file);
-        if (line_pos < 0) {
-            break;
-        }
-        if (fgets(line, sizeof(line), file) == NULL) {
-            break;
-        }
-        size_t len = strlen(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-            line[--len] = '\0';
-        }
-        if (len == 0) {
-            continue;
-        }
-        total_entries++;
-        if (line_positions != NULL && window_capacity > 0) {
-            if (position_count < window_capacity) {
-                size_t idx = (position_start + position_count) % window_capacity;
-                line_positions[idx] = line_pos;
-                position_count++;
-            } else {
-                line_positions[position_start] = line_pos;
-                position_start = (position_start + 1) % window_capacity;
-            }
-        }
-    }
-
-    size_t available = (skip_newest > total_entries) ? 0 : (total_entries - skip_newest);
-    size_t desired = available < (size_t)limit ? available : (size_t)limit;
-    size_t returned = 0;
+    size_t parsed_count = 0;
     size_t parse_errors = 0;
-    size_t first_buffer_index =
-        (position_count > 0 && total_entries > position_count) ? (total_entries - position_count)
-                                                              : 0;
-    size_t start_index = (desired > 0) ? (total_entries - skip_newest - desired) : 0;
-
-    for (size_t i = 0; i < desired; ++i) {
-        size_t target_index = start_index + i;
-        if (target_index < first_buffer_index || target_index >= total_entries) {
-            continue;
-        }
-        size_t relative = target_index - first_buffer_index;
-        if (relative >= position_count) {
-            continue;
-        }
-        size_t buffer_idx = (position_start + relative) % window_capacity;
-        if (fseek(file, line_positions[buffer_idx], SEEK_SET) != 0) {
-            continue;
-        }
-        if (fgets(line, sizeof(line), file) == NULL) {
-            continue;
-        }
+    while (parsed_count < window_capacity && fgets(line, sizeof(line), file) != NULL) {
         size_t len = strlen(line);
         while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
             line[--len] = '\0';
@@ -400,23 +398,58 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str, int
         cJSON *item = cJSON_Parse(line);
         if (item == NULL) {
             if (parse_errors < 5) {
-                ESP_LOGW(TAG,
-                         "Failed to parse log line %zu from %s: %.64s",
-                         target_index,
-                         path,
-                         line);
+                ESP_LOGW(TAG, "Failed to parse SD log line: %.64s", line);
             }
             parse_errors++;
             continue;
         }
-        cJSON_AddItemToArray(items, item);
-        returned++;
+        parsed_entries[parsed_count++] = item;
     }
 
     fclose(file);
-    free(line_positions);
 
-    bool has_more = (skip_newest + returned) < total_entries;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *items = cJSON_CreateArray();
+    if (root == NULL || items == NULL) {
+        for (size_t i = 0; i < parsed_count; ++i) {
+            if (parsed_entries[i] != NULL) {
+                cJSON_Delete(parsed_entries[i]);
+            }
+        }
+        free(parsed_entries);
+        if (root != NULL) {
+            cJSON_Delete(root);
+        }
+        if (items != NULL) {
+            cJSON_Delete(items);
+        }
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t end_idx = (parsed_count > (size_t)offset) ? (parsed_count - (size_t)offset) : 0;
+    size_t start_idx = (end_idx > (size_t)limit) ? (end_idx - (size_t)limit) : 0;
+    size_t returned = 0;
+
+    for (size_t i = start_idx; i < end_idx; ++i) {
+        cJSON *entry = parsed_entries[i];
+        if (entry == NULL) {
+            continue;
+        }
+        cJSON_AddItemToArray(items, entry);
+        parsed_entries[i] = NULL;
+        returned++;
+    }
+
+    for (size_t i = 0; i < parsed_count; ++i) {
+        if (parsed_entries[i] != NULL) {
+            cJSON_Delete(parsed_entries[i]);
+        }
+    }
+    free(parsed_entries);
+
+    size_t total_entries = (tail_offset == 0) ? parsed_count : 0;
+
     cJSON_AddItemToObject(root, "entries", items);
     cJSON_AddNumberToObject(root, "count", returned);
     cJSON_AddNumberToObject(root, "total", total_entries);
@@ -426,12 +459,12 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str, int
     cJSON_AddStringToObject(root, "source", "sd");
     cJSON_AddStringToObject(root, "date", date_str);
     ESP_LOGI(TAG,
-             "SD logs %s returning %u entries (offset=%d limit=%d total=%u parse_errors=%u)",
+             "SD logs %s returning %u entries (offset=%d limit=%d has_more=%d parse_errors=%u)",
              date_str,
              (unsigned)returned,
              offset,
              limit,
-             (unsigned)total_entries,
+             has_more,
              (unsigned)parse_errors);
 
     char *json = cJSON_PrintUnformatted(root);
@@ -444,6 +477,83 @@ static esp_err_t api_logs_handler_sd(httpd_req_t *req, const char *date_str, int
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
     free(json);
+    return ESP_OK;
+}
+
+static esp_err_t api_logs_download_handler(httpd_req_t *req)
+{
+    char query[64] = {0};
+    char date_param[16] = {0};
+
+    int query_len = httpd_req_get_url_query_len(req);
+    if (query_len <= 0 || query_len >= (int)sizeof(query)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing date");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK ||
+        httpd_query_key_value(query, "date", date_param, sizeof(date_param)) != ESP_OK ||
+        date_param[0] == '\0') {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing date");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[128];
+    if (!api_logs_build_sd_path(date_param, path, sizeof(path))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid date");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Log file not found");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    char filename[32];
+    snprintf(filename, sizeof(filename), "%s.log", date_param);
+    char disposition[80];
+    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s\"", filename);
+
+    httpd_resp_set_type(req, "application/x-ndjson");
+    httpd_resp_set_hdr(req, "Content-Disposition", disposition);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate");
+
+    char *chunk = malloc(LOG_DOWNLOAD_CHUNK_SIZE);
+    if (chunk == NULL) {
+        fclose(file);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t send_res = ESP_OK;
+    size_t bytes_read = 0;
+    while ((bytes_read = fread(chunk, 1, LOG_DOWNLOAD_CHUNK_SIZE, file)) > 0) {
+        send_res = httpd_resp_send_chunk(req, chunk, bytes_read);
+        if (send_res != ESP_OK) {
+            break;
+        }
+    }
+
+    bool read_error = ferror(file);
+    free(chunk);
+    fclose(file);
+
+    if (send_res != ESP_OK) {
+        httpd_resp_sendstr_chunk(req, NULL);
+        return send_res;
+    }
+
+    esp_err_t finish_res = httpd_resp_sendstr_chunk(req, NULL);
+    if (finish_res != ESP_OK) {
+        return finish_res;
+    }
+
+    if (read_error) {
+        ESP_LOGW(TAG, "SD log %s truncated due to read error", date_param);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "SD log %s streamed to client", date_param);
     return ESP_OK;
 }
 #endif
@@ -1101,6 +1211,15 @@ static const httpd_uri_t api_logs_uri = {
     .user_ctx = NULL
 };
 
+#if CONFIG_KC_SD_LOGGER_ENABLED
+static const httpd_uri_t api_logs_download_uri = {
+    .uri = "/api/logs/download",
+    .method = HTTP_GET,
+    .handler = api_logs_download_handler,
+    .user_ctx = NULL
+};
+#endif
+
 static const httpd_uri_t api_mqtt_status_uri = {
     .uri = "/api/mqtt/status",
     .method = HTTP_GET,
@@ -1552,6 +1671,9 @@ esp_err_t http_server_start(const http_server_config_t *config)
     httpd_register_uri_handler(s_server, &ca_cert_uri);  // CA certificate download
     httpd_register_uri_handler(s_server, &api_status_uri);
     httpd_register_uri_handler(s_server, &api_logs_uri);
+#if CONFIG_KC_SD_LOGGER_ENABLED
+    httpd_register_uri_handler(s_server, &api_logs_download_uri);
+#endif
     httpd_register_uri_handler(s_server, &api_mqtt_status_uri);
     httpd_register_uri_handler(s_server, &api_clear_wifi_uri);
     httpd_register_uri_handler(s_server, &api_reboot_uri);

@@ -76,6 +76,7 @@ const LOG_MAX_BUFFER=2000;
 const LOG_PAGE_SIZE=50;
 const LOG_FETCH_TIMEOUT_MS=5000;
 const LOG_FETCH_TIMEOUT_SD_MS=40000;
+const LOG_DOWNLOAD_TIMEOUT_MS=300000; // allow large archive downloads (~5 min)
 const LOG_SEQUENCE_TRACK_LIMIT=LOG_MAX_BUFFER*4;
 const LOG_COLOR_MAP={
   EZO_SENSOR:'#48d597',
@@ -958,11 +959,13 @@ function handleLogSourceChange(value){
   }
 }
 
-function handleLogArchiveDate(value){const normalized=normalizeLogArchiveDate(value);const dateInput=document.getElementById('logArchiveDate');if(!normalized){if(value){showLogToast('Enter a valid date (YYYY-MM-DD, 2000-2099)');}logArchiveDate='';if(dateInput&&dateInput.value){dateInput.value='';}resetLogPaginationState(true);return;}logArchiveDate=normalized;if(dateInput&&dateInput.value!==normalized){dateInput.value=normalized;}if(logSource==='sd'){resetLogPaginationState(true);loadLogs(true);}}
+function handleLogArchiveDate(value){const normalized=normalizeLogArchiveDate(value);const dateInput=document.getElementById('logArchiveDate');if(!normalized){if(value){showLogToast('Enter a valid date (YYYY-MM-DD, 2000-2099)');}logArchiveDate='';if(dateInput&&dateInput.value){dateInput.value='';}resetLogPaginationState(true);updateLogSourceControls();return;}logArchiveDate=normalized;if(dateInput&&dateInput.value!==normalized){dateInput.value=normalized;}updateLogSourceControls();if(logSource==='sd'){resetLogPaginationState(true);loadLogs(true);}}
 
 function loadArchiveLogs(){if(logSource!=='sd')return;if(!logArchiveDate){showLogToast('Select a date first');return;}resetLogPaginationState(true);loadLogs(true);}
 
-function updateLogSourceControls(){const dateInput=document.getElementById('logArchiveDate');const loadButton=document.getElementById('logArchiveLoad');if(dateInput){if(logSource==='sd'){dateInput.style.display='inline-flex';}else{dateInput.style.display='none';dateInput.value='';logArchiveDate='';}}if(loadButton){loadButton.style.display=logSource==='sd'?'inline-flex':'none';}updateLogPaginationStatus();}
+async function downloadArchiveLogs(){if(logSource!=='sd'){showLogToast('Switch to SD archive mode to download logs');return;}const normalized=normalizeLogArchiveDate(logArchiveDate);if(!normalized){showLogToast('Select a valid date (YYYY-MM-DD, 2000-2099)');return;}const controller=new AbortController();const timeoutMs=LOG_DOWNLOAD_TIMEOUT_MS;const hasTimeout=Number.isFinite(timeoutMs)&&timeoutMs>0;const timeoutId=hasTimeout?setTimeout(()=>controller.abort(),timeoutMs):null;const downloadButton=document.getElementById('logArchiveDownload');if(downloadButton)downloadButton.disabled=true;try{const res=await fetch(`/api/logs/download?date=${normalized}`,{signal:controller.signal});if(!res.ok){const errText=await res.text();throw new Error(errText||'Download failed');}const blob=await res.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${normalized}.log`;document.body.appendChild(link);link.click();document.body.removeChild(link);URL.revokeObjectURL(url);showLogToast(`Download started for ${normalized}`);}catch(err){console.error('Log download failed',err);const reason=err?.name==='AbortError'?'Timed out waiting for device. Try again after a few seconds.':err.message;showLogToast(`Download failed: ${reason}`);}finally{if(timeoutId)clearTimeout(timeoutId);if(downloadButton)downloadButton.disabled=false;}}
+
+function updateLogSourceControls(){const dateInput=document.getElementById('logArchiveDate');const loadButton=document.getElementById('logArchiveLoad');const downloadButton=document.getElementById('logArchiveDownload');const showArchiveControls=logSource==='sd';if(dateInput){if(showArchiveControls){dateInput.style.display='inline-flex';}else{dateInput.style.display='none';dateInput.value='';logArchiveDate='';}}if(loadButton){loadButton.style.display=showArchiveControls?'inline-flex':'none';loadButton.disabled=showArchiveControls&&!logArchiveDate;}if(downloadButton){downloadButton.style.display=showArchiveControls?'inline-flex':'none';downloadButton.disabled=!showArchiveControls||!logArchiveDate;}updateLogPaginationStatus();}
 
 function attachLogEventHandlers(){if(!logTerminalEl)return;logTerminalEl.addEventListener('scroll',handleLogScrollEvent);logTerminalEl.addEventListener('click',handleLogTerminalClick);logTerminalEl.addEventListener('mouseover',handleLogHover);logTerminalEl.addEventListener('mouseleave',clearCorrelationHighlight);}
 
