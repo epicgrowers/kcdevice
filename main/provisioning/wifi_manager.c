@@ -1,5 +1,7 @@
 #include "wifi_manager.h"
 #include "provisioning/provisioning_state.h"
+#include "common/error_handler.h"
+#include "common/secure_logging.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -117,9 +119,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         // ESP-IDF automatically saves credentials with WIFI_STORAGE_FLASH
         ESP_LOGI(TAG, "Credentials saved automatically by ESP-IDF (encrypted in NVS)");
         
-        // Clear sensitive data from memory
-        memset(pending_ssid, 0, sizeof(pending_ssid));
-        memset(pending_password, 0, sizeof(pending_password));
+        // Clear sensitive data from memory (compiler-safe)
+        secure_zero_memory(pending_ssid, sizeof(pending_ssid));
+        secure_zero_memory(pending_password, sizeof(pending_password));
         
         char ip_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
@@ -154,31 +156,37 @@ esp_err_t wifi_manager_init(void)
     }
 
     // Initialize TCP/IP stack
-    ESP_ERROR_CHECK(esp_netif_init());
-    
+    FATAL_ON_ERROR(esp_netif_init(), "TCP/IP stack initialization failed");
+
     // Create default event loop
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    
+    FATAL_ON_ERROR(esp_event_loop_create_default(), "Event loop creation failed");
+
     // Create default WiFi station
     esp_netif_create_default_wifi_sta();
-    
+
     // Initialize WiFi with default config
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    
+    FATAL_ON_ERROR(esp_wifi_init(&cfg), "WiFi driver initialization failed");
+
     // Use ESP-IDF's built-in NVS storage for WiFi credentials
     // This works seamlessly with wifi_prov_mgr
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
-    
+    FATAL_ON_ERROR(esp_wifi_set_storage(WIFI_STORAGE_FLASH), "WiFi storage configuration failed");
+
     // Register event handlers
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
-    
+    FATAL_ON_ERROR(
+        esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL),
+        "WiFi event handler registration failed"
+    );
+    FATAL_ON_ERROR(
+        esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL),
+        "IP event handler registration failed"
+    );
+
     // Set WiFi mode to station
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    
+    FATAL_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), "WiFi station mode configuration failed");
+
     // Start WiFi
-    ESP_ERROR_CHECK(esp_wifi_start());
+    FATAL_ON_ERROR(esp_wifi_start(), "WiFi start failed");
 
     ESP_LOGI(TAG, "WiFi manager initialized successfully");
     return ESP_OK;
@@ -186,17 +194,15 @@ esp_err_t wifi_manager_init(void)
 
 esp_err_t wifi_manager_connect(const char* ssid, const char* password)
 {
-    if (ssid == NULL || password == NULL) {
-        ESP_LOGE(TAG, "SSID or password is NULL");
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    ESP_LOGI(TAG, "Connecting to WiFi SSID: %s", ssid);
-    
+    RETURN_ON_NULL(ssid, "SSID parameter is NULL");
+    RETURN_ON_NULL(password, "Password parameter is NULL");
+
+    ESP_LOGI(TAG, "Connecting to WiFi SSID: %s", secure_mask_ssid(ssid));
+
     // Store credentials temporarily
     strncpy(pending_ssid, ssid, sizeof(pending_ssid) - 1);
     strncpy(pending_password, password, sizeof(pending_password) - 1);
-    
+
     // Configure WiFi
     wifi_config_t wifi_config = {0};
     strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
@@ -204,18 +210,24 @@ esp_err_t wifi_manager_connect(const char* ssid, const char* password)
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
-    
+
     // Stop WiFi if already running
     esp_wifi_stop();
-    
+
     // Set configuration
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    
+    FATAL_ON_ERROR(
+        esp_wifi_set_config(WIFI_IF_STA, &wifi_config),
+        "WiFi configuration failed"
+    );
+
+    // Secure cleanup - clear password from wifi_config struct
+    secure_zero_memory(&wifi_config, sizeof(wifi_config));
+
     // Mark that we have credentials configured
     s_has_credentials_configured = true;
-    
+
     // Start WiFi
-    ESP_ERROR_CHECK(esp_wifi_start());
+    FATAL_ON_ERROR(esp_wifi_start(), "WiFi start failed after configuration");
     
     // Reset retry counter
     s_retry_num = 0;
@@ -236,26 +248,32 @@ bool wifi_manager_is_connected(void)
 
 esp_err_t wifi_manager_get_stored_credentials(char* ssid, char* password)
 {
+    RETURN_ON_NULL(ssid, "SSID output buffer is NULL");
+    RETURN_ON_NULL(password, "Password output buffer is NULL");
+
     // Use ESP-IDF's built-in WiFi config storage
     wifi_config_t wifi_cfg;
-    esp_err_t ret = esp_wifi_get_config(WIFI_IF_STA, &wifi_cfg);
-    
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get WiFi config: %s", esp_err_to_name(ret));
-        return ret;
-    }
-    
+    RETURN_ON_ERROR(
+        esp_wifi_get_config(WIFI_IF_STA, &wifi_cfg),
+        "Failed to get WiFi configuration from storage"
+    );
+
     // Check if SSID is configured
     if (wifi_cfg.sta.ssid[0] == '\0') {
         ESP_LOGI(TAG, "No stored WiFi credentials found");
+        secure_zero_memory(&wifi_cfg, sizeof(wifi_cfg));
         return ESP_ERR_NOT_FOUND;
     }
-    
+
     // Copy credentials to output buffers
     strncpy(ssid, (char*)wifi_cfg.sta.ssid, 33);
     strncpy(password, (char*)wifi_cfg.sta.password, 64);
-    
-    ESP_LOGD(TAG, "Retrieved stored credentials for SSID: %s", ssid);
+
+    ESP_LOGD(TAG, "Retrieved stored credentials for SSID: %s", secure_mask_ssid(ssid));
+
+    // Secure cleanup
+    secure_zero_memory(&wifi_cfg, sizeof(wifi_cfg));
+
     return ESP_OK;
 }
 
@@ -311,8 +329,8 @@ esp_err_t wifi_manager_clear_credentials(void)
     // Reset local state regardless of restore outcome
     s_has_credentials_configured = false;
     s_is_connected = false;
-    memset(pending_ssid, 0, sizeof(pending_ssid));
-    memset(pending_password, 0, sizeof(pending_password));
+    secure_zero_memory(pending_ssid, sizeof(pending_ssid));
+    secure_zero_memory(pending_password, sizeof(pending_password));
 
     if (s_retry_timer != NULL) {
         xTimerStop(s_retry_timer, 0);
